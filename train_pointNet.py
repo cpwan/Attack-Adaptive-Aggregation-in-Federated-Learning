@@ -175,29 +175,41 @@ if __name__=="__main__":
 
     # In[2]:
 
-
-    attacks=['Omniscient2','Omniscient3','Omniscient4','Omniscient5',
-             'labelFlipping2','labelFlipping3','labelFlipping4','labelFlipping5']
-    attacker_list_labelflipping={'':[],'Omniscient':[],'labelFlipping':[0],'Omniscient_Aggresive':[],
-                                'Omniscient2':[],
+    attacks=['No-Attacks',
+             'Omniscient1',
+             'Omniscient2',
+             'Omniscient3',
+             'Omniscient4',
+             'Omniscient5',
+             'Label-Flipping1',
+             'Label-Flipping2',
+             'Label-Flipping3',
+             'Label-Flipping4',
+             'Label-Flipping5']
+    
+    attacker_list_labelflipping={'No-Attacks':[],
+                                 'Omniscient1':[],
+                                 'Omniscient2':[],
                                  'Omniscient3':[],
                                  'Omniscient4':[],
                                  'Omniscient5':[],
-                                 'labelFlipping2':[1,2],
-                                 'labelFlipping3':[3,6,9],
-                                 'labelFlipping4':[1,3,5,7],
-                                 'labelFlipping5':[0,2,4,6,8]
+                                 'Label-Flipping1':[0],
+                                 'Label-Flipping2':[1,2],
+                                 'Label-Flipping3':[3,6,9],
+                                 'Label-Flipping4':[1,3,5,7],
+                                 'Label-Flipping5':[0,2,4,6,8]
                                 }
-    attacker_list_omniscient={'':[],'Omniscient':[0],'labelFlipping':[],'Omniscient_Aggresive':[0],
-                                'Omniscient2':[1,2],
+    attacker_list_omniscient =  {'No-Attacks':[],
+                                 'Omniscient1':[0],
+                                 'Omniscient2':[1,2],
                                  'Omniscient3':[3,6,9],
                                  'Omniscient4':[1,3,5,7],
                                  'Omniscient5':[0,2,4,6,8],
-                                 'labelFlipping2':[],
-                                 'labelFlipping3':[],
-                                 'labelFlipping4':[],
-                                 'labelFlipping5':[]}
-
+                                 'Label-Flipping1':[],
+                                 'Label-Flipping2':[],
+                                 'Label-Flipping3':[],
+                                 'Label-Flipping4':[],
+                                 'Label-Flipping5':[]}
 
     from tensorboardX import SummaryWriter
     def write(name,scalar):
