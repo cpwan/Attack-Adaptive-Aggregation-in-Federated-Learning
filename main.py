@@ -28,7 +28,7 @@ def main(args):
     device='cuda'
     attacks=args.attacks
  
-    writer=SummaryWriter(f'./logs/{args.output_folder}/{args.GAR}_{args.loader_type}_{attacks}')
+    writer=SummaryWriter(f'./logs/{args.output_folder}/{args.loader_type}/{attacks}/{args.GAR}')
 
     
     
@@ -39,6 +39,10 @@ def main(args):
     model0 = Net().to(device)
     server=Server(model0,testData,device)
     server.set_GAR(args.GAR)
+#     server.isSaveChanges=True
+#     server.savePath=f'./AggData/{args.attacks}'
+#     from pathlib import Path
+#     Path(server.savePath).mkdir(parents=True, exist_ok=True)
     #create clients instance
     
     attacker_list_labelflipping=args.attacker_list_labelflipping
@@ -49,7 +53,7 @@ def main(args):
         if i in attacker_list_labelflipping:
             client_i=Attacker_LabelFlipping(i,model,trainData[i],optimizer,device)
         elif i in attacker_list_omniscient:
-            client_i=Attacker_Omniscient(i,model,trainData[i],optimizer,device)
+            client_i=Attacker_Omniscient(i,model,trainData[i],optimizer,device)            
         else:
             client_i=Client(i,model,trainData[i],optimizer,device)
         server.attach(client_i)
@@ -84,7 +88,7 @@ if __name__=="__main__":
             self.seed=1
             self.log_interval=10
             self.num_clients=10
-            self.output_folder='model'
+            self.output_folder='experiments'
     #             self.loader_type='non_overlap_label'
     #             self.loader_path='./data/non_overlap_loader.pk'
             self.loader_type='iid'
@@ -92,17 +96,50 @@ if __name__=="__main__":
             self.GAR='median'
             self.attacker_list_labelflipping=[]
             self.attacker_list_omniscient=[]
-            self.attacks=''#'Omniscient','labelFlipping'
+            self.attacks=''#'Omniscient','Label-Flipping'
     args=Arguments()
     
-    GAR=['fedavg','median','deepGAR']
+#     GAR=['deepGAR']
+    GAR=['deepGAR','median','fedavg']
+
     loader=[('iid','./data/iid_loader.pk'),]#('non_overlap_label','./data/non_overlap_loader.pk')]
 #     loader=[('non_overlap_label','./data/non_overlap_loader.pk')]
 
-    attacks=['','Omniscient','labelFlipping']
-#     attacks=['Omniscient_Aggresive']
-    attacker_list_labelflipping={'':[],'Omniscient':[],'labelFlipping':[0],'Omniscient_Aggresive':[]}
-    attacker_list_omniscient={'':[],'Omniscient':[0],'labelFlipping':[],'Omniscient_Aggresive':[0]}
+    attacks=['No-Attacks',
+             'Omniscient1',
+             'Omniscient2',
+             'Omniscient3',
+             'Omniscient4',
+             'Omniscient5',
+             'Label-Flipping1',
+             'Label-Flipping2',
+             'Label-Flipping3',
+             'Label-Flipping4',
+             'Label-Flipping5']
+    
+    attacker_list_labelflipping={'No-Attacks':[],
+                                 'Omniscient1':[],
+                                 'Omniscient2':[],
+                                 'Omniscient3':[],
+                                 'Omniscient4':[],
+                                 'Omniscient5':[],
+                                 'Label-Flipping1':[0],
+                                 'Label-Flipping2':[1,2],
+                                 'Label-Flipping3':[3,6,9],
+                                 'Label-Flipping4':[1,3,5,7],
+                                 'Label-Flipping5':[0,2,4,6,8]
+                                }
+    attacker_list_omniscient =  {'No-Attacks':[],
+                                 'Omniscient1':[0],
+                                 'Omniscient2':[1,2],
+                                 'Omniscient3':[3,6,9],
+                                 'Omniscient4':[1,3,5,7],
+                                 'Omniscient5':[0,2,4,6,8],
+                                 'Label-Flipping1':[],
+                                 'Label-Flipping2':[],
+                                 'Label-Flipping3':[],
+                                 'Label-Flipping4':[],
+                                 'Label-Flipping5':[]}
     for attack in attacks:
         for (loader_type,loader_path) in loader:
             for gar in GAR:              

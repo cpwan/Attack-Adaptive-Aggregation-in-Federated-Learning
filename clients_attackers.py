@@ -32,13 +32,13 @@ class Attacker_LabelFlipping(Client):
         
         
 class Attacker_Omniscient(Client):
-    def __init__(self,cid,model,dataLoader,optimizer,device):
+    def __init__(self,cid,model,dataLoader,optimizer,device,scale=10):
         super(Attacker_Omniscient, self).__init__(cid,model,dataLoader,optimizer,device)
-   
+        self.scale=scale
     def update(self):
         assert self.isTrained, 'nothing to update, call train() to obtain gradients'
         newState=self.model.state_dict()
         for param in self.originalState:
             self.stateChange[param]=newState[param]-self.originalState[param]
-            self.stateChange[param]*=(-10)
+            self.stateChange[param]*=(-self.scale)
         self.isTrained=False

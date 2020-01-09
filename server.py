@@ -103,32 +103,18 @@ class Server():
         import torch.nn as nn
         import torch.nn.functional as F
         import torch.optim as optim
-        class Mlp(nn.Module):
-            def __init__(self,n,in_dim):
-                super(Mlp, self).__init__()
-                self.in_dim=in_dim
-                self.fc1 = nn.Linear(self.in_dim, n,bias=False)
-                self.fc2 = nn.Linear(self.in_dim, 1,bias=False)        
-                self.fc3 = nn.Linear(n+1, 1,bias=False)
-
-            def forward(self, x):
-                x = x.view(-1, self.in_dim)
-                x1 = F.relu(self.fc1(x))
-                x2 = F.relu(self.fc2(x))
-
-                x = (self.fc3(torch.cat([x1,x2],1)))
-                return x   
-        net=Mlp(10,10)
-        net.load_state_dict(torch.load('deepGAR.pt'))
+        from pointNetGAR import PointNet
+        net=PointNet(1,10)
+        net.load_state_dict(torch.load('pointNetAR_big_199.pt'))
         return net
     
     def deepGAR(self,clients):
 
         net=self.load_deep_net().cuda()
         def func(arr):
-            arr=torch.sort(arr)[0]
+#             arr=torch.sort(arr)[0]
             with torch.no_grad():
-                out=net(arr.cuda()).squeeze()
+                out=net(arr.cuda())[2].squeeze()
             return out
         return self.FedFuncPerLayer(clients,func=func)
 
@@ -175,9 +161,16 @@ class Server():
 
             ##stacking the weight in the innerest dimension
             param_stack=torch.stack([delta[param] for delta in deltas],-1)
-            shaped=param_stack.view(-1,len(clients))
+            shaped=param_stack.view(-1,1,len(clients))
+            dset=torch.utils.data.TensorDataset(shaped)
+            dloader=torch.utils.data.DataLoader(dset,batch_size=25000)
+            result=[]
+            for data in dloader:
+                result.append(func(data[0]))
+            result_tensor=torch.stack(result)
+            buffer=result_tensor.reshape(Delta[param].shape)
             ##applying `func` to the [n by params] tensor in the innerest dimension
-            buffer=func(shaped).reshape(Delta[param].shape)
+#             buffer=func(shaped).reshape(Delta[param].shape)
             Delta[param]=buffer
         return Delta
     
