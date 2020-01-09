@@ -39,10 +39,11 @@ def main(args):
     model0 = Net().to(device)
     server=Server(model0,testData,device)
     server.set_GAR(args.GAR)
-#     server.isSaveChanges=True
-#     server.savePath=f'./AggData/{args.attacks}'
-#     from pathlib import Path
-#     Path(server.savePath).mkdir(parents=True, exist_ok=True)
+    if args.save_update_vectors:
+        server.isSaveChanges=True
+        server.savePath=f'./AggData/{args.attacks}'
+        from pathlib import Path
+        Path(server.savePath).mkdir(parents=True, exist_ok=True)
     #create clients instance
     
     attacker_list_labelflipping=args.attacker_list_labelflipping
@@ -97,6 +98,12 @@ if __name__=="__main__":
             self.attacker_list_labelflipping=[]
             self.attacker_list_omniscient=[]
             self.attacks=''#'Omniscient','Label-Flipping'
+            
+            ## to obtain update vectors for training aggregation network, 
+            ## set this parameter to be True, 
+            ## the training data will then be in ./AggData
+            self.save_update_vectors=False 
+            
     args=Arguments()
     
 #     GAR=['deepGAR']
