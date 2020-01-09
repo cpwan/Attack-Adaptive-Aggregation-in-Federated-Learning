@@ -100,10 +100,7 @@ class Server():
         return self.FedFunc(clients,func=torch.median)
     
     def load_deep_net(self):
-        import torch.nn as nn
-        import torch.nn.functional as F
-        import torch.optim as optim
-        from pointNetGAR import PointNet
+        from pointNet import PointNet
         net=PointNet(1,10)
         net.load_state_dict(torch.load('pointNetAR_big_199.pt'))
         return net
