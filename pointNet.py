@@ -45,12 +45,12 @@ class PointNet(nn.Module):
                         block(128,1024),
                         nn.AdaptiveMaxPool2d(1)
                     )
-        self.direct_out= block(1024,10)
+        self.direct_out= block(1024,n) #No mlp after concatenation 
         self.MLP = torch.nn.Sequential(
                         block(1088,512),
                         block(512,256),
                         block(256,128),
-                        nn.Dropout(p=0.7, inplace=True),
+#                         nn.Dropout(p=0.7, inplace=True),
                         block_no_activation(128,1)
                       )
 
@@ -58,31 +58,27 @@ class PointNet(nn.Module):
         
 
     def forward(self, input):
-#         print(input.shape)
-#         x = input.view(-1, self.n, self.in_dim)
+        #batchsize x vector dimension x num clients x 1
         x=input.view(-1,self.in_dim,self.n,1)
+        #Local modules
         for module in self.local:
             x = module(x)
-#             print(f'local:\t {x.shape}')
         x_local=x
+        #Global modules
         for module in self.globa:
             x = module(x)
-#             print(f'global:\t {x.shape}')
         x_global=x.repeat(1,1,self.n,1)
-#         print(f'tile:\t {x_global.shape}')
+        #Integrate to a MLP
         x=torch.cat([x_local,x_global],dim=1)
-#         print(x.shape)
         for module in self.MLP:
             x = module(x)
-#             print(f'MLP:\t {x.shape}')
-#         x=self.direct_out(x)
         x=x.squeeze()
-#        x = F.softmax(x,dim=1)
+        
+        #Convert to probability
         x = torch.sigmoid(x)
-#         pred=dot_product(input,x).squeeze(-1)
         x2= F.softmax(x,dim=1)
         x3 = (x>0.5).float().cuda()
-        x3 = x3/(torch.sum(x3,-1).view(-1,1)+1e-14)
+        x3 = x3/(torch.sum(x3,-1).view(-1,1)+1e-14) #if all clients are with low likelihood, be conservative to changes=> set the result to 0
         pred_softmax = torch.sum(x2.view(-1,1,self.n)*input,dim=-1).unsqueeze(-1)
         pred_binary = torch.sum(x3.view(-1,1,self.n)*input,dim=-1).unsqueeze(-1)
         return x, pred_softmax, pred_binary

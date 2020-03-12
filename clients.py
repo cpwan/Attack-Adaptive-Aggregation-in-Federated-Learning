@@ -7,7 +7,7 @@ import torch.optim as optim
 from copy import deepcopy
 
 class Client():
-    def __init__(self,cid,model,dataLoader,optimizer,device):
+    def __init__(self,cid,model,dataLoader,optimizer,device,inner_epochs=1):
         self.cid=cid
         self.model=model
         self.dataLoader=dataLoader
@@ -17,34 +17,34 @@ class Client():
         self.init_stateChange()
         self.originalState=deepcopy(model.state_dict())
         self.isTrained=False
-        self.epoch=0
         
     def init_stateChange(self):
         states=deepcopy(self.model.state_dict())
         for param,values in states.items():
             values*=0
         self.stateChange=states
+        
     def setModelParameter(self,states):
         self.model.load_state_dict(deepcopy(states))
         self.originalState=deepcopy(states)
         self.model.zero_grad()
+        
+    def data_transform(self,data,target):
+        return data,target
+    
     def train(self):
         self.model.train()
-        for batch_idx, (data, target) in enumerate(self.dataLoader):
-            data, target = data.to(self.device), target.to(self.device)
-            self.optimizer.zero_grad()
-            output = self.model(data)
-            loss = F.nll_loss(output, target)
-            loss.backward()
-            self.optimizer.step()
-            if batch_idx % self.log_interval == 0:
-                print('client {} ## Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    self.cid, self.epoch, batch_idx * len(data), len(self.dataLoader.dataset),
-                    100. * batch_idx / len(self.dataLoader), loss.item()))
-        self.epoch+=1
+        for epoch in inner_epochs:
+            for batch_idx, (data, target) in enumerate(self.dataLoader):
+                data, target = self.data_transform(data,target)
+                data, target = data.to(self.device), target.to(self.device)
+                self.optimizer.zero_grad()
+                output = self.model(data)
+                loss = F.nll_loss(output, target)
+                loss.backward()
+                self.optimizer.step()
         self.isTrained=True
         
-#     def test(self,testDataLoader,steps,writer):
     def test(self,testDataLoader):
 
         self.model.eval()
@@ -59,6 +59,7 @@ class Client():
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
         test_loss /= len(testDataLoader)
+## Uncomment to print the test scores of each client
 #         writer.add_scalar('test/loss', test_loss, steps)
 #         writer.add_scalar('test/accuracy', correct / len(testDataLoader.dataset), steps)
 

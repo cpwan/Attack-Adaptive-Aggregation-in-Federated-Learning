@@ -5,30 +5,35 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from clients import *
+from backdoor_utils import Backdoor_Utils
 
 import random
 labels=torch.tensor([0,1,2,3,4,5,6,7,8,9])
 class Attacker_LabelFlipping(Client):
     def __init__(self,cid,model,dataLoader,optimizer,device):
         super(Attacker_LabelFlipping, self).__init__(cid,model,dataLoader,optimizer,device)
-   
-    def train(self):
-        self.model.train()
-        for batch_idx, (data, target) in enumerate(self.dataLoader):
-            target=torch.stack(list(map(lambda x: random.choice([i for i in labels if i!=x]),target)))
+    def data_transform(self,data,target):
+        target=torch.stack(list(map(lambda x: random.choice([i for i in labels if i!=x]),target)))
+        return data,target
+    
+class Attacker_LabelFlippingDirectional(Client):
+    def __init__(self,cid,model,dataLoader,optimizer,device):
+        super(Attacker_LabelFlippingDirectional, self).__init__(cid,model,dataLoader,optimizer,device)
+    def data_transform(self,data,target):
+        target=torch.stack(list(map(lambda x: labels[7] if x==labels[1] else x,target)))
+        return data,target
 
-            data, target = data.to(self.device), target.to(self.device)
-            self.optimizer.zero_grad()
-            output = self.model(data)
-            loss = F.nll_loss(output, target)
-            loss.backward()
-            self.optimizer.step()
-            if batch_idx % self.log_interval == 0:
-                print('client {} ## Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    self.cid, self.epoch, batch_idx * len(data), len(self.dataLoader.dataset),
-                    100. * batch_idx / len(self.dataLoader), loss.item()))
-        self.epoch+=1
-        self.isTrained=True
+class Attacker_Backdoor(Client):
+    def __init__(self,cid,model,dataLoader,optimizer,device):
+        super(Attacker_Backdoor, self).__init__(cid,model,dataLoader,optimizer,device)
+        self.utils=Backdoor_Utils()
+
+    def data_transform(self,data,target):
+        data, target = self.utils.get_poison_batch(data, target, backdoor_fraction=0.5, backdoor_label = self.utils.backdoor_label)        
+        return data,target
+
+        
+
         
         
 class Attacker_Omniscient(Client):
