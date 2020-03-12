@@ -41,7 +41,7 @@ def parse_args():
     args.attacker_list_omniscient = np.random.permutation(list(range(n)))[:m]
                         
     if args.experiment_name==None:
-        args.experiment_name=f"{args.loader_type}/{attacks}/{args.GAR}"
+        args.experiment_name=f"{args.loader_type}/{args.attacks}/{args.GAR}"
                         
     return args
                         

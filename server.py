@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from copy import deepcopy
 from backdoor_utils import Backdoor_Utils
+path_to_aggNet="./aggNet/aggNet_dim64_19.pt"
 
 class Server():
     def __init__(self,model,dataLoader,device):
@@ -155,7 +156,7 @@ class Server():
         num_clients=len(self.clients)
         self.vector_dimension=64
         net=Net(self.vector_dimension,num_clients)
-        net.load_state_dict(torch.load('./aggNet/aggNet_dim64_19.pt'))
+        net.load_state_dict(torch.load(path_to_aggNet))
         return net
     
     def deepGAR(self,clients):

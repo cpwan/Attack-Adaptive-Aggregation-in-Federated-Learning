@@ -17,7 +17,7 @@ class Client():
         self.init_stateChange()
         self.originalState=deepcopy(model.state_dict())
         self.isTrained=False
-        
+        self.inner_epochs=inner_epochs
     def init_stateChange(self):
         states=deepcopy(self.model.state_dict())
         for param,values in states.items():
@@ -34,7 +34,7 @@ class Client():
     
     def train(self):
         self.model.train()
-        for epoch in inner_epochs:
+        for epoch in range(self.inner_epochs):
             for batch_idx, (data, target) in enumerate(self.dataLoader):
                 data, target = self.data_transform(data,target)
                 data, target = data.to(self.device), target.to(self.device)
