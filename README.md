@@ -23,4 +23,4 @@ The Aggregation network is not yet finalized. To train the aggregation network,
 
 The trained network will be saved to `./aggNet/`.
 
-To change the aggregation network used for defensing the federated attacks, change the `path_to_aggNet` in server.py
+To change the aggregation network used for defending the federated attacks, change the `path_to_aggNet` in server.py
