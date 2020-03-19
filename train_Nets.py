@@ -76,7 +76,7 @@ def get_concat_loader():
     datasets=[]
     from os import listdir
     attacks=listdir('./AggData')
-    for epoch in range(1):
+    for epoch in range(2):
         for attack in attacks:            
             path=f'./AggData/{attack}/FedAvg_{epoch}.pt'
             label=torch.load(f'./AggData/{attack}/label.pt')
@@ -108,7 +108,9 @@ def get_concat_loader():
     return train_loader, test_loader
 
 
+
 # In[5]:
+
 
 # In[5]:
 
@@ -153,6 +155,7 @@ def test(net,test_loader,device,message_prefix):
     print('%s: \t%.4E \t %.4E \t%.4E \t%.4E (BCE: %.4E)' % (message_prefix,accuracy/count, accuracy_binary/count, accuracy_mean/count,accuracy_median/count,BCEloss/count ))
     return accuracy/count, accuracy_binary/count, accuracy_mean/count, accuracy_median/count, BCEloss/count
 
+
 # In[11]:
 if __name__=="__main__":
     import argparse
@@ -160,6 +163,8 @@ if __name__=="__main__":
     parser.add_argument("-vd","--vector_dimension",type=int,default=1,help="Dimension of weight feeding to the network")
     parser.add_argument("-l2","--weight_decay",type=float,default=0,help="Weight decay for l2 regularization")
     parser.add_argument("-n" ,"--model_name", type=str)
+    parser.add_argument("-net","--network", type=str)
+    
     args=parser.parse_args()
     torch.manual_seed(0)
     num_epoch=200
@@ -172,7 +177,21 @@ if __name__=="__main__":
     import allocateGPU
     allocateGPU.allocate_gpu()
     
-    from aggNet import Net
+    
+    import baseline
+    import aggNet
+    import aggNet_Blocks
+    import agg_Blocks_Multiple
+    import rand_net
+    networks={'baseline'   :baseline.Net,
+              'aggNetRes'  :aggNet.Net,
+              'aggNetBlock':aggNet_Blocks.Net,
+              'aggNetBlockMultiple':agg_Blocks_Multiple.Net,
+              'random':rand_net.Net
+              
+             }
+    Net=networks[args.network]
+    
     import torch.optim as optim
 
 
@@ -180,9 +199,9 @@ if __name__=="__main__":
 
 
     from tensorboardX import SummaryWriter
-    def write(name,scalar,i=0):
+    def write(name,tag, scalar,i=0):
         writer=SummaryWriter(f'./agg_logs/{name}')
-        writer.add_scalar('l1 loss', scalar, i)
+        writer.add_scalar(tag, scalar, i)
         writer.close()
 
 
@@ -210,22 +229,24 @@ if __name__=="__main__":
                 continue
 
             print('Start training of %s'%training_alias)
-            optimizer = optim.Adam(net.parameters(), lr=lr , weight_decay=args.weight_decay)
+            if not args.network=='random':
+                optimizer = optim.Adam(net.parameters(), lr=lr , weight_decay=args.weight_decay)
             print('L1 loss:\tmodel \tmodel (binarized) \tmean \tmedian ')
             test(net,test_loader,device,f'Epoch -1')
             for epoch in range(num_epoch):
-                train(net,train_loader,criterion,optimizer,device,mode)
+                if not args.network=='random':
+                    train(net,train_loader,criterion,optimizer,device,mode)
                 score=test(net,test_loader,device,f'Epoch {epoch}')
                 if epoch%20==19:
                     torch.save(net.state_dict(),f'./aggNet/{args.model_name}_dim{vector_dimension}_{epoch}.pt')
                 if epoch%10==9:
                     #use another set of data once in a while
                     train_loader, test_loader = get_concat_loader()
-                write(training_alias+'/weighted',score[0],epoch)
-                write(training_alias+'/binary',  score[1],epoch)  
-                write(training_alias+'/mean',    score[2],epoch)
-                write(training_alias+'/median',  score[3],epoch)
-                write(training_alias+'/BCEloss',  score[4],epoch)
+                write(training_alias+'/weighted', 'l1 loss', score[0],epoch)
+                write(training_alias+'/binary', 'l1 loss',  score[1],epoch)  
+                write(training_alias+'/mean', 'l1 loss',    score[2],epoch)
+                write(training_alias+'/median', 'l1 loss',  score[3],epoch)
+                write(training_alias+'/BCEloss', 'BCE loss',  score[4],epoch)
 
 
 

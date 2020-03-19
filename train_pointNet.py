@@ -76,7 +76,7 @@ def get_concat_loader():
     datasets=[]
     from os import listdir
     attacks=listdir('./AggData')
-    for epoch in range(1):
+    for epoch in range(6):
         for attack in attacks:            
             path=f'./AggData/{attack}/FedAvg_{epoch}.pt'
             label=torch.load(f'./AggData/{attack}/label.pt')
@@ -110,8 +110,6 @@ def get_concat_loader():
 
 # In[5]:
 
-# In[5]:
-
 
 def train(net,train_loader,criterion,optimizer,device, on=0):
     net.to(device)
@@ -129,7 +127,6 @@ def train(net,train_loader,criterion,optimizer,device, on=0):
     
 def test(net,test_loader,device,message_prefix):
     net.to(device)
-    BCEloss = 0
     accuracy = 0
     accuracy_binary = 0
     accuracy_mean = 0
@@ -140,18 +137,17 @@ def test(net,test_loader,device,message_prefix):
     with torch.no_grad():
         for idx, (data, target) in enumerate(test_loader):
             data = data.to(device)
-            label = target[0].to(device)
-            target = target[1].to(device)            
+            target = target[1].to(device)
             outputs = net(data)
-            BCEloss        +=nn.BCELoss(reduction='sum')(outputs[0],label)
             accuracy       +=F.l1_loss(outputs[1],                       target, reduction="sum")
             accuracy_binary+=F.l1_loss(outputs[2],                       target, reduction="sum")
             accuracy_mean  +=F.l1_loss(data.mean(-1).unsqueeze(-1),      target, reduction="sum")
             accuracy_median+=F.l1_loss(data.median(-1)[0].unsqueeze(-1), target, reduction="sum")
             count+=len(data)
             printProgressBar(idx+1, num_batches, prefix = 'Validation Progress:', suffix = 'Complete', length = 50)
-    print('%s: \t%.4E \t %.4E \t%.4E \t%.4E (BCE: %.4E)' % (message_prefix,accuracy/count, accuracy_binary/count, accuracy_mean/count,accuracy_median/count,BCEloss/count ))
-    return accuracy/count, accuracy_binary/count, accuracy_mean/count, accuracy_median/count, BCEloss/count
+    print('%s: \t%.4E \t %.4E \t%.4E \t%.4E' % (message_prefix,accuracy/count, accuracy_binary/count, accuracy_mean/count,accuracy_median/count ))
+    return accuracy/count, accuracy_binary/count, accuracy_mean/count, accuracy_median/count
+
 
 # In[11]:
 if __name__=="__main__":
@@ -172,7 +168,7 @@ if __name__=="__main__":
     import allocateGPU
     allocateGPU.allocate_gpu()
     
-    from aggNet import Net
+    from pointNet import Net
     import torch.optim as optim
 
 
@@ -217,7 +213,7 @@ if __name__=="__main__":
                 train(net,train_loader,criterion,optimizer,device,mode)
                 score=test(net,test_loader,device,f'Epoch {epoch}')
                 if epoch%20==19:
-                    torch.save(net.state_dict(),f'./aggNet/{args.model_name}_dim{vector_dimension}_{epoch}.pt')
+                    torch.save(net.state_dict(),f'./pointerNet/{args.model_name}_dim{vector_dimension}_{epoch}.pt')
                 if epoch%10==9:
                     #use another set of data once in a while
                     train_loader, test_loader = get_concat_loader()
@@ -225,7 +221,6 @@ if __name__=="__main__":
                 write(training_alias+'/binary',  score[1],epoch)  
                 write(training_alias+'/mean',    score[2],epoch)
                 write(training_alias+'/median',  score[3],epoch)
-                write(training_alias+'/BCEloss',  score[4],epoch)
 
 
 

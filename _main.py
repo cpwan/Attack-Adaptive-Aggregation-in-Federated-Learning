@@ -11,6 +11,7 @@ from tensorboardX import SummaryWriter
 
 
 import mnist
+import cifar
 from server import Server
 from clients import Client
 from modules import Net
@@ -58,19 +59,28 @@ def main(args):
     
  
     device='cuda'
+    allocate_gpu()
+    
     attacks=args.attacks
     
     writer=SummaryWriter(f'./logs/{args.output_folder}/{args.experiment_name}')
 
     
-    
-    trainData=mnist.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
-    testData=mnist.test_dataloader(args.test_batch_size)
-    
+    if args.dataset=='mnist':
+        trainData=mnist.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
+        testData=mnist.test_dataloader(args.test_batch_size)
+        Net=mnist.Net
+        criterion=F.nll_loss
+    elif args.dataset=='cifar':
+        trainData=cifar.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
+        testData=cifar.test_dataloader(args.test_batch_size)
+        Net=cifar.Net
+        criterion=F.cross_entropy
     #create server instance
     model0 = Net().to(device)
-    server=Server(model0,testData,device)
+    server=Server(model0,testData,criterion,device)
     server.set_GAR(args.GAR)
+    server.path_to_aggNet=args.path_to_aggNet
     if args.save_model_weights:
         server.isSaveChanges=True
         server.savePath=f'./AggData/{args.attacks}'
@@ -99,15 +109,15 @@ def main(args):
         model = Net().to(device)
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
         if i in attacker_list_labelFlipping:
-            client_i=Attacker_LabelFlipping(i,model,trainData[i],optimizer,device)
+            client_i=Attacker_LabelFlipping(i,model,trainData[i],optimizer,criterion,device)
         elif i in attacker_list_labelFlippingDirectional:
-            client_i=Attacker_LabelFlippingDirectional(i,model,trainData[i],optimizer,device)
+            client_i=Attacker_LabelFlippingDirectional(i,model,trainData[i],optimizer,criterion,device)
         elif i in attacker_list_omniscient:
-            client_i=Attacker_Omniscient(i,model,trainData[i],optimizer,device,args.omniscient_scale)
+            client_i=Attacker_Omniscient(i,model,trainData[i],optimizer,criterion,device,args.omniscient_scale)
         elif i in attacker_list_backdoor:
-            client_i=Attacker_Backdoor(i,model,trainData[i],optimizer,device)
+            client_i=Attacker_Backdoor(i,model,trainData[i],optimizer,criterion,device)
         else:
-            client_i=Client(i,model,trainData[i],optimizer,device)
+            client_i=Client(i,model,trainData[i],optimizer,criterion,device)
         server.attach(client_i)
         
     loss,accuracy=server.test()

@@ -26,6 +26,41 @@ class block_no_activation(nn.Module):
         out=self.main(x)
         return out
     
+class pointNetBlock(nn.Module):
+    def __init__(self,in_dim,n,out=1):
+        super(pointNetBlock, self).__init__()
+        self.in_dim = in_dim
+        self.n = n
+        self.out=out
+ 
+        self.local = torch.nn.Sequential(
+                        block(self.in_dim,32)
+                    )
+        self.globa = torch.nn.Sequential(
+                        block(32,128),
+                        nn.AdaptiveMaxPool2d(1)
+                    )
+        self.MLP = torch.nn.Sequential(
+                        block(128+32,64),
+                        block_no_activation(64,self.out)
+                      )
+    def forward(self,x):
+        '''
+        x    : batch size x window dim x num clients x 1
+        '''
+        x=x.view(-1,self.in_dim,self.n,1)
+
+        x = self.local(x)
+        x_local=x
+        x = self.globa(x)
+        x_globa=x.repeat(1,1,self.n,1)
+
+        x=torch.cat([x_local,x_globa],dim=1)
+        x=self.MLP(x)
+#         x=x.squeeze()
+        out=x
+        return out
+    
 class Net(nn.Module):
     def __init__(self,in_dim, n):
         '''
@@ -35,22 +70,14 @@ class Net(nn.Module):
         super(Net, self).__init__()
         self.in_dim = in_dim
         self.n = n
- 
-        self.local = torch.nn.Sequential(
-                        block(self.in_dim,64),
-                    )
-        self.globa = torch.nn.Sequential(
-                        block(64,1024),
-                        nn.AdaptiveMaxPool2d(1)
-                    )
-        self.direct_out= block(1024,n) #No mlp after concatenation 
-        self.MLP = torch.nn.Sequential(
-                        block(1088,128),
-#                         nn.Dropout(p=0.7, inplace=True),
-                        block_no_activation(128,1)
-                      )
+        self.main = torch.nn.Sequential(
+                        pointNetBlock(in_dim,n,4),
+                        nn.ReLU(),
+                        pointNetBlock(4,n,1),
+                        nn.ReLU(),
+                        pointNetBlock(1,n,1)               
+                        )
 
-        
 
     def forward(self, input):
 #         print(input.shape)
@@ -64,24 +91,15 @@ class Net(nn.Module):
         '''
         median=torch.median(x,dim=2)[0]
         x=x-median[:,:,None,:]
-        for module in self.local:
-            x = module(x)
-        x_local=x
-        #Global modules
-        for module in self.globa:
-            x = module(x)
-        x_global=x.repeat(1,1,self.n,1)
-        #Integrate to a MLP
-        x=torch.cat([x_local,x_global],dim=1)
-        for module in self.MLP:
-            x = module(x)
-        x=x.squeeze()
         
+        x=self.main(x)
+
 #        x = F.softmax(x,dim=1)
+        x=x.squeeze()
         x = torch.sigmoid(x)
 #         pred=dot_product(input,x).squeeze(-1)
         x2= F.softmax(x,dim=1)
-        x3 = (x>0.5).float().cuda()
+        x3 = (x>0.5).float().to(input)
         x3 = x3/(torch.sum(x3,-1).view(-1,1)+1e-14)
         pred_softmax = torch.sum(x2.view(-1,1,self.n)*input,dim=-1).unsqueeze(-1)
         pred_binary = torch.sum(x3.view(-1,1,self.n)*input,dim=-1).unsqueeze(-1)
@@ -91,3 +109,11 @@ class Net(nn.Module):
         self.n=n
         self.forward(input)
 
+if __name__ == '__main__':
+    vd=1
+    nc=10
+    bs=64
+    net = Net(vd,nc)
+    y = net(torch.randn(bs,vd,nc))
+    for i in y:
+        print(i.size())

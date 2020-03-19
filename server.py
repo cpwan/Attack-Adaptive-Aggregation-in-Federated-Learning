@@ -6,10 +6,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 from copy import deepcopy
 from backdoor_utils import Backdoor_Utils
-path_to_aggNet="./aggNet/aggNet_dim64_19.pt"
+path_to_aggNet="./aggNet/aggNet_dim64_199.pt"
 
 class Server():
-    def __init__(self,model,dataLoader,device):
+    def __init__(self,model,dataLoader,criterion=F.nll_loss,device='cpu'):
         self.clients=[]
         self.model=model
         self.dataLoader=dataLoader
@@ -22,6 +22,8 @@ class Server():
         self.func=torch.mean
         self.isSaveChanges=False
         self.savePath='./AggData'
+        self.criterion=criterion
+        self.path_to_aggNet="./aggNet/net.pt"
         
     def init_stateChange(self):
         states=deepcopy(self.model.state_dict())
@@ -38,19 +40,20 @@ class Server():
         self.model.eval()
         test_loss = 0
         correct = 0
+        count = 0
         with torch.no_grad():
             for data, target in self.dataLoader:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
-                test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
+                test_loss += self.criterion(output, target, reduction='sum').item() # sum up batch loss
                 pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
-
-        test_loss /= len(self.dataLoader.dataset)
-        accuracy=100. * correct / len(self.dataLoader.dataset)
+                count += pred.shape[0]
+        test_loss /= count
+        accuracy=100. * correct / count
 
         print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-            test_loss, correct, len(self.dataLoader.dataset), accuracy))
+            test_loss, correct, count, accuracy))
         return test_loss,accuracy
     
     def test_backdoor(self):
@@ -63,7 +66,7 @@ class Server():
                 data, target = utils.get_poison_batch(data, target, backdoor_fraction=1, backdoor_label=utils.backdoor_label, evaluation=True)
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
-                test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
+                test_loss += self.criterion(output, target, reduction='sum').item() # sum up batch loss
                 pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
@@ -93,33 +96,7 @@ class Server():
         c.train()
         c.update()
         return c
-    def train_concurrent(self,group):
-        import torch.multiprocessing as mp
-        try:
-            mp.set_start_method('spawn')
-        except RuntimeError:
-            pass
-        selectedClients=[self.clients[i] for i in group]
-        pool=mp.Pool(5)               
-        selectedClients=pool.map(self.worker,selectedClients)
-        pool.close()
-        pool.join()
-        
-        
-        j=0
-        for i in group:
-            self.clients[i]=selectedClients[j]
-            j+=1
-        
-        debug=True
-        
-        if self.isSaveChanges:
-            self.saveChanges(selectedClients)
-        
-        Delta=self.GAR(selectedClients)
-        for param in self.model.state_dict():
-            self.model.state_dict()[param]+=Delta[param]
-        self.iter+=1
+ 
         
     def set_GAR(self,gar):
         if   gar=='fedavg':
@@ -129,7 +106,15 @@ class Server():
         elif gar=='deepGAR':
             self.GAR=self.deepGAR
         elif gar=='deepGARNbh':
-            self.GAR=self.deepGARNbh         
+            self.GAR=self.deepGARNbh   
+        elif gar=='baseline':
+            self.GAR=self.net_baseline
+        elif gar=='aggNetResidual':
+            self.GAR=self.net_aggNetResidual
+        elif gar=='aggNetBlocks':
+            self.GAR=self.net_aggNetBlocks
+        elif gar=='aggNetBlocksMultiple':
+            self.GAR=self.net_aggNetBlocksMultiple
         else:
             raise ValueError("Not a valid aggregation rule or aggregation rule not implemented")
 
@@ -139,24 +124,18 @@ class Server():
         return self.FedFunc(clients,func=torch.median)
     
     def load_deep_net(self):
-        from pointNet import PointNet
+        
         num_clients=len(self.clients)
-        net=PointNet(1,num_clients)
-        net.load_state_dict(torch.load('./aggNet/pointNet_199.pt'))
+        net=self.Net(1,num_clients)
+        net.load_state_dict(torch.load(self.path_to_aggNet))
         return net
     
     def load_deep_net_nbh(self):
-#         from pointNet import PointNet
-#         num_clients=len(self.clients)
-#         self.vector_dimension=64
-#         net=PointNet(self.vector_dimension,num_clients)
-#         net.load_state_dict(torch.load('./aggNet/aggNet_dim64_19.pt'))
-#         return net
         from aggNet import Net
         num_clients=len(self.clients)
-        self.vector_dimension=64
+        self.vector_dimension=1
         net=Net(self.vector_dimension,num_clients)
-        net.load_state_dict(torch.load(path_to_aggNet))
+        net.load_state_dict(torch.load(self.path_to_aggNet))
         return net
     
     def deepGAR(self,clients):
@@ -178,7 +157,30 @@ class Server():
                 out=net(arr.cuda())[2][:,0].squeeze()
             return out
         return self.FedFuncNbhPerLayer(clients,func=func,vd=self.vector_dimension)
-
+    def net_baseline(self,clients):
+        from baseline import Net
+        self.Net=Net
+        self.path_to_aggNet='./aggNet/baseline_dim1_199.pt'
+        out=self.deepGAR(clients)
+        return out
+    def net_aggNetResidual(self,clients):
+        from aggNet import Net
+        self.Net=Net
+        self.path_to_aggNet='./aggNet/aggNetRes_dim1_199.pt'
+        out=self.deepGAR(clients)
+        return out
+    def net_aggNetBlocks(self,clients):
+        from aggNet_Blocks import Net
+        self.Net=Net
+        self.path_to_aggNet='./aggNet/aggNetBlock_dim1_199.pt'
+        out=self.deepGAR(clients)
+        return out    
+    def net_aggNetBlocksMultiple(self,clients):
+        from agg_Blocks_Multiple import Net
+        self.Net=Net
+        self.path_to_aggNet='./aggNet/aggNetBlockMultiple_dim1_199.pt'
+        out=self.deepGAR(clients)
+        return out    
     def FedFunc(self,clients,func=torch.mean):
         '''
         apply func to each paramters across clients
@@ -187,10 +189,12 @@ class Server():
         deltas=[c.getDelta() for c in clients]
 
         for param in Delta:
-
+            if not "FloatTensor" in Delta[param].type():
+                continue
             ##stacking the weight in the innerest dimension
             param_stack=torch.stack([delta[param] for delta in deltas],-1)
             shaped=param_stack.view(-1,len(clients))
+#             print(shaped.type())
             ##applying `func` to every array (of size `num_clients`) in the innerest dimension
             buffer=torch.stack(list(map(func,[shaped[i] for i in range(shaped.size(0))]))).reshape(Delta[param].shape)
             Delta[param]=buffer
@@ -202,7 +206,8 @@ class Server():
         deltas=[c.getDelta() for c in clients]
 
         for param in Delta:
-
+            if not "FloatTensor" in Delta[param].type():
+                continue
             ##stacking the weight in the innerest dimension
             param_stack=torch.stack([delta[param] for delta in deltas],-1)
             shaped=param_stack.view(-1,len(clients))
@@ -236,17 +241,22 @@ class Server():
             return entriesWithNbh
             
         for param in Delta:
-            
+            if not "FloatTensor" in Delta[param].type():
+                continue
             ##stacking the weight in the innerest dimension
             ## size of layer x1x number of clients
             param_stack=torch.stack([delta[param] for delta in deltas],-1) # d1 x d2 x d3 x... xnum clients
             shaped=param_stack.view(-1,1,len(clients)) #d1*d2*d3*... x 1 x num clients
-            dset=torch.utils.data.TensorDataset(getNbh(shaped,vd))
-            dloader=torch.utils.data.DataLoader(dset,batch_size=25000)
+            dset=torch.utils.data.TensorDataset(shaped)
+            dloader=torch.utils.data.DataLoader(dset,batch_size=8192) #num entry in layer x vd x num clients
             result=[]
             for data in dloader:
-                result.append(func(data[0]))
-            result_tensor=torch.stack(result)
+#                 print(data[0].shape)
+                data_withNbh=getNbh(data[0],vd)
+#                 print(data_withNbh.shape)
+                result.append(func(data_withNbh))
+            #result: sequence of b x 1 tensors, b may differ
+            result_tensor=torch.cat(result)
             buffer=result_tensor.reshape(Delta[param].shape)
             ##applying `func` to the [n by params] tensor in the innerest dimension
 #             buffer=func(shaped).reshape(Delta[param].shape)
@@ -261,7 +271,8 @@ class Server():
         deltas=[c.getDelta() for c in clients]
 
         for param in Delta:
-            
+            if not "FloatTensor" in Delta[param].type():
+                continue
             ##stacking the weight in the innerest dimension
             ## size of layer x1x number of clients
             param_stack=torch.stack([delta[param].cpu() for delta in deltas],-1) # d1 x d2 x d3 x... xnum clients
@@ -271,7 +282,7 @@ class Server():
             result=[]
             for data in dloader:
                 result.append(func(data[0]))
-            result_tensor=torch.stack(result)
+            result_tensor=torch.cat(result)
             buffer=result_tensor.reshape(Delta[param].shape)
             ##applying `func` to the [n by params] tensor in the innerest dimension
 #             buffer=func(shaped).reshape(Delta[param].shape)

@@ -110,8 +110,6 @@ def get_concat_loader():
 
 # In[5]:
 
-# In[5]:
-
 
 def train(net,train_loader,criterion,optimizer,device, on=0):
     net.to(device)
@@ -153,6 +151,7 @@ def test(net,test_loader,device,message_prefix):
     print('%s: \t%.4E \t %.4E \t%.4E \t%.4E (BCE: %.4E)' % (message_prefix,accuracy/count, accuracy_binary/count, accuracy_mean/count,accuracy_median/count,BCEloss/count ))
     return accuracy/count, accuracy_binary/count, accuracy_mean/count, accuracy_median/count, BCEloss/count
 
+
 # In[11]:
 if __name__=="__main__":
     import argparse
@@ -172,7 +171,7 @@ if __name__=="__main__":
     import allocateGPU
     allocateGPU.allocate_gpu()
     
-    from aggNet import Net
+    from aggNet_Blocks import Net
     import torch.optim as optim
 
 
@@ -226,6 +225,7 @@ if __name__=="__main__":
                 write(training_alias+'/mean',    score[2],epoch)
                 write(training_alias+'/median',  score[3],epoch)
                 write(training_alias+'/BCEloss',  score[4],epoch)
+
 
 
 

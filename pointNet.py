@@ -26,13 +26,13 @@ class block_no_activation(nn.Module):
         out=self.main(x)
         return out
     
-class PointNet(nn.Module):
+class Net(nn.Module):
     def __init__(self,in_dim, n):
         '''
         in_dim:=dimension of weight vector
         n:= number of clients
         '''
-        super(PointNet, self).__init__()
+        super(Net, self).__init__()
         self.in_dim = in_dim
         self.n = n
         self.local = torch.nn.Sequential(
@@ -45,7 +45,6 @@ class PointNet(nn.Module):
                         block(128,1024),
                         nn.AdaptiveMaxPool2d(1)
                     )
-        self.direct_out= block(1024,n) #No mlp after concatenation 
         self.MLP = torch.nn.Sequential(
                         block(1088,512),
                         block(512,256),

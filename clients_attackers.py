@@ -10,22 +10,22 @@ from backdoor_utils import Backdoor_Utils
 import random
 labels=torch.tensor([0,1,2,3,4,5,6,7,8,9])
 class Attacker_LabelFlipping(Client):
-    def __init__(self,cid,model,dataLoader,optimizer,device):
-        super(Attacker_LabelFlipping, self).__init__(cid,model,dataLoader,optimizer,device)
+    def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
+        super(Attacker_LabelFlipping, self).__init__(cid,model,dataLoader,optimizer,criterion, device ,inner_epochs)
     def data_transform(self,data,target):
         target=torch.stack(list(map(lambda x: random.choice([i for i in labels if i!=x]),target)))
         return data,target
     
 class Attacker_LabelFlippingDirectional(Client):
-    def __init__(self,cid,model,dataLoader,optimizer,device):
-        super(Attacker_LabelFlippingDirectional, self).__init__(cid,model,dataLoader,optimizer,device)
+    def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
+        super(Attacker_LabelFlippingDirectional, self).__init__(cid,model,dataLoader,optimizer,criterion, device ,inner_epochs)
     def data_transform(self,data,target):
         target=torch.stack(list(map(lambda x: labels[7] if x==labels[1] else x,target)))
         return data,target
 
 class Attacker_Backdoor(Client):
-    def __init__(self,cid,model,dataLoader,optimizer,device):
-        super(Attacker_Backdoor, self).__init__(cid,model,dataLoader,optimizer,device)
+    def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
+        super(Attacker_Backdoor, self).__init__(cid,model,dataLoader,optimizer,criterion, device ,inner_epochs)
         self.utils=Backdoor_Utils()
 
     def data_transform(self,data,target):
@@ -37,8 +37,8 @@ class Attacker_Backdoor(Client):
         
         
 class Attacker_Omniscient(Client):
-    def __init__(self,cid,model,dataLoader,optimizer,device,scale=10):
-        super(Attacker_Omniscient, self).__init__(cid,model,dataLoader,optimizer,device)
+    def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1,scale=10):
+        super(Attacker_Omniscient, self).__init__(cid,model,dataLoader,optimizer,criterion, device ,inner_epochs)
         self.scale=scale
     def update(self):
         assert self.isTrained, 'nothing to update, call train() to obtain gradients'

@@ -39,15 +39,8 @@ class Net(nn.Module):
         self.local = torch.nn.Sequential(
                         block(self.in_dim,64),
                     )
-        self.globa = torch.nn.Sequential(
-                        block(64,1024),
-                        nn.AdaptiveMaxPool2d(1)
-                    )
-        self.direct_out= block(1024,n) #No mlp after concatenation 
         self.MLP = torch.nn.Sequential(
-                        block(1088,128),
-#                         nn.Dropout(p=0.7, inplace=True),
-                        block_no_activation(128,1)
+                        block_no_activation(64,1)
                       )
 
         
@@ -57,37 +50,51 @@ class Net(nn.Module):
         '''
         input: batch size x window dim x num clients
         '''
-#         x = input.view(-1, self.n, self.in_dim)
-        x=input.view(-1,self.in_dim,self.n,1)
+        sorted_input=torch.sort(input,dim=2)
+        
+        
+        assert input.shape[1]==1, "requires window size to be 1"
+        x_sorted=sorted_input[0]
+        sorted_index=sorted_input[1].squeeze()
+        revert_index=torch.argsort(sorted_index,dim=1)
+        assert torch.equal(torch.gather(x_sorted.squeeze(), 1, revert_index),input.squeeze()), "revert indexing failed"
+        x=x_sorted.view(-1,self.in_dim,self.n,1)
+        
+        
         '''
         x    : batch size x window dim x num clients x 1
         '''
         median=torch.median(x,dim=2)[0]
-        x=x-median[:,:,None,:]
+        x=x-median[:,:,None,:]#sort along clients
         for module in self.local:
             x = module(x)
-        x_local=x
-        #Global modules
-        for module in self.globa:
-            x = module(x)
-        x_global=x.repeat(1,1,self.n,1)
-        #Integrate to a MLP
-        x=torch.cat([x_local,x_global],dim=1)
+
         for module in self.MLP:
             x = module(x)
         x=x.squeeze()
         
 #        x = F.softmax(x,dim=1)
         x = torch.sigmoid(x)
+        
+        
+        
 #         pred=dot_product(input,x).squeeze(-1)
         x2= F.softmax(x,dim=1)
-        x3 = (x>0.5).float().cuda()
+        x3 = (x>0.5).float().to(x_sorted)
         x3 = x3/(torch.sum(x3,-1).view(-1,1)+1e-14)
-        pred_softmax = torch.sum(x2.view(-1,1,self.n)*input,dim=-1).unsqueeze(-1)
-        pred_binary = torch.sum(x3.view(-1,1,self.n)*input,dim=-1).unsqueeze(-1)
+        pred_softmax = torch.sum(x2.view(-1,1,self.n)*x_sorted,dim=-1).unsqueeze(-1)
+        pred_binary = torch.sum(x3.view(-1,1,self.n)*x_sorted,dim=-1).unsqueeze(-1)
+
+        x = torch.gather(x,1, revert_index) #revert indexing
         return x, pred_softmax, pred_binary
      
     def forward_n(self, input, n):
         self.n=n
         self.forward(input)
 
+if __name__ == '__main__':
+
+    net = Net(1,10)
+    y = net((torch.randn(100,1,10)))
+    for item in y:
+        print(item.size())

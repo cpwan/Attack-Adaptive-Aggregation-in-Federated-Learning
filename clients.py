@@ -7,7 +7,7 @@ import torch.optim as optim
 from copy import deepcopy
 
 class Client():
-    def __init__(self,cid,model,dataLoader,optimizer,device,inner_epochs=1):
+    def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
         self.cid=cid
         self.model=model
         self.dataLoader=dataLoader
@@ -18,6 +18,7 @@ class Client():
         self.originalState=deepcopy(model.state_dict())
         self.isTrained=False
         self.inner_epochs=inner_epochs
+        self.criterion=criterion
     def init_stateChange(self):
         states=deepcopy(self.model.state_dict())
         for param,values in states.items():
@@ -40,7 +41,7 @@ class Client():
                 data, target = data.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
                 output = self.model(data)
-                loss = F.nll_loss(output, target)
+                loss = self.criterion(output, target)
                 loss.backward()
                 self.optimizer.step()
         self.isTrained=True
@@ -54,7 +55,7 @@ class Client():
             for data, target in testDataLoader:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
-                test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
+                test_loss += self.criterion(output, target, reduction='sum').item() # sum up batch loss
                 pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
