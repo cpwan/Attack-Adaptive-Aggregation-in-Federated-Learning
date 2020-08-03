@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
-from dataloader import labelLoader,iidLoader
+from dataloader import *
 import pickle
 
 class Net(nn.Module):
@@ -26,7 +26,7 @@ class Net(nn.Module):
         x = self.fc2(x)
         return F.log_softmax(x, dim=1)
 
-def basic_loader(num_clients,loader_type=labelLoader ):
+def basic_loader(num_clients,loader_type):
     dataset=datasets.MNIST(
         './data',
         train=True,
@@ -37,12 +37,14 @@ def basic_loader(num_clients,loader_type=labelLoader ):
         ]))
     return loader_type(num_clients,dataset)
 
-def train_dataloader(num_clients,loader_type=labelLoader ,store=True,path='./data/loader.pk'):
-    assert loader_type in ['iid','non_overlap_label'], 'Loader has to be either \'iid\' or \'non_overlap_label \''
+def train_dataloader(num_clients,loader_type='iid' ,store=True,path='./data/loader.pk'):
+    assert loader_type in ['iid','byLabel','dirichlet'], 'Loader has to be either \'iid\' or \'non_overlap_label \''
     if loader_type=='iid':
         loader_type=iidLoader
-    elif loader_type=='non_overlap_label':
-        loader_type=labelLoader
+    elif loader_type=='byLabel':
+        loader_type=byLabelLoader
+    elif loader_type=='dirichlet':
+        loader_type=dirichletLoader
 
         
     if store:
@@ -50,10 +52,10 @@ def train_dataloader(num_clients,loader_type=labelLoader ,store=True,path='./dat
             with open(path, 'rb') as handle:
                 loader = pickle.load(handle)
         except:
-            print('loader not found, initialize one')
+            print('Loader not found, initializing one')
             loader=basic_loader(num_clients,loader_type)
     else:
-        print('initialize a data loader')
+        print('Initialize a data loader')
         loader=basic_loader(num_clients,loader_type)
     if store:
         with open(path, 'wb') as handle:
@@ -72,6 +74,22 @@ def test_dataloader(test_batch_size):
     return test_loader
 
 if __name__ == '__main__':
-    net = Net().cuda()
-    y = net((torch.randn(100,1,28,28)).cuda())
-    print(y.size())
+    print("#Initialize a network")
+    net = Net()
+    batch_size=100
+    y = net((torch.randn(batch_size,1,28,28)))
+    print(f"Output shape of the network with batchsize {batch_size}:\t {y.size()}")
+    
+    print("\n#Initialize dataloaders")
+    loader_types=['iid','byLabel','dirichlet']
+    for i in range(len(loader_types)):
+        loader=train_dataloader(10,loader_types[i],store=False)
+        print(f"Initialized {len(loader)} loaders (type: {loader_types[i]}), each with batch size {loader.bsz}.\
+        \nThe size of dataset in each loader are:")
+        print([len(loader[i].dataset) for i in range(len(loader))])
+        print(f"Total number of data: {sum([len(loader[i].dataset) for i in range(len(loader))])}")
+    
+    print("\n#Feeding data to network")
+    x=next(iter(loader[i]))[0]
+    y=net(x)
+    print(f"Size of input:  {x.shape} \nSize of output: {y.shape}")

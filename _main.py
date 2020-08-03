@@ -18,30 +18,6 @@ from modules import Net
 from allocateGPU import *
 from clients_attackers import *
 
-# class Arguments():
-#     def __init__(self):
-#         self.batch_size=64
-#         self.test_batch_size=1000
-#         self.epochs=10
-#         self.lr=0.01
-#         self.momentum=0.5
-#         self.seed=1
-#         self.log_interval=10
-#         self.num_clients=10
-#         self.output_folder='experiment'
-# #             self.loader_type='non_overlap_label'
-# #             self.loader_path='./data/non_overlap_loader.pk'
-#         self.loader_type='iid'
-#         self.loader_path='./data/iid_loader.pk'
-#         self.GAR='fedavg'
-#         self.attacker_list_labelFlipping=[]
-#         self.attacker_list_omniscient=[]
-#         self.omniscient_scale=[]
-#         self.attacker_list_backdoor=[]
-#         self.attacker_list_labelFlippingDirectional=[]
-#         self.attacks=''#'Omniscient','labelFlipping'
-#         self.save_model_weights=False
-
 def main(args):
     
     print('#####################')
@@ -83,7 +59,7 @@ def main(args):
     server.path_to_aggNet=args.path_to_aggNet
     if args.save_model_weights:
         server.isSaveChanges=True
-        server.savePath=f'./AggData/{args.attacks}'
+        server.savePath=f'./AggData/{args.loader_type}/{args.dataset}/{args.attacks}'
         from pathlib import Path
         Path(server.savePath).mkdir(parents=True, exist_ok=True)
         '''
@@ -130,7 +106,7 @@ def main(args):
 
         writer.add_scalar('test/loss_backdoor', loss, steps)
         writer.add_scalar('test/backdoor_success_rate', accuracy, steps)
-    for j in range(10):        
+    for j in range(args.epochs):        
         steps=j+1
         
         print('\n\n########EPOCH %d ########'%j)

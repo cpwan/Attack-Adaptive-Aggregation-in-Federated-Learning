@@ -47,7 +47,7 @@ class Net(nn.Module):
         '''
         x    : batch size x window dim x num clients x 1
         '''
-        x = torch.zeros(x.shape[0],x.shape[2]).to(input)
+        x = torch.rand(x.shape[0],x.shape[2]).to(input)
 #         pred=dot_product(input,x).squeeze(-1)
         x2 = F.softmax(x,dim=1)
         x3 = (x>0.5).float().to(input)

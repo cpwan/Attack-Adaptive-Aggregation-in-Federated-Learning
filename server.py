@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from copy import deepcopy
 from backdoor_utils import Backdoor_Utils
+import utils
 path_to_aggNet="./aggNet/aggNet_dim64_199.pt"
 
 class Server():
@@ -115,6 +116,18 @@ class Server():
             self.GAR=self.net_aggNetBlocks
         elif gar=='aggNetBlocksMultiple':
             self.GAR=self.net_aggNetBlocksMultiple
+        elif gar=='aggNetBlockNormalize':
+            self.GAR=self.net_aggNet_Blocks_normalize
+        elif gar=='gm':
+            self.GAR=self.geometricMedian
+        elif gar=='krum':
+            self.GAR=self.krum
+        elif gar=='mkrum':
+            self.GAR=self.mkrum
+        elif gar=='irlsSort':
+            self.GAR=self.net_irlsNeuralSort
+        elif gar=='attention':
+            self.GAR=self.net_attention
         else:
             raise ValueError("Not a valid aggregation rule or aggregation rule not implemented")
 
@@ -147,6 +160,19 @@ class Server():
                 out=net(arr.cuda())[2].squeeze()
             return out
         return self.FedFuncPerLayer(clients,func=func)
+    def deepGARWeighted(self,clients):
+
+        net=self.load_deep_net().cuda()
+        def func(arr):
+#             arr=torch.sort(arr)[0]
+            with torch.no_grad():
+                out=net(arr.cuda())[1]
+#                 d=out.size(0)
+#                 a=(torch.std(out,1)@out)
+#                 a=a/torch.sum(a)
+#                 out=a.repeat(d,1)
+            return out
+        return self.FedFuncPerLayer(clients,func=func)
     
     def deepGARNbh(self,clients):
 
@@ -172,7 +198,8 @@ class Server():
     def net_aggNetBlocks(self,clients):
         from aggNet_Blocks import Net
         self.Net=Net
-        self.path_to_aggNet='./aggNet/aggNetBlock_dim1_199.pt'
+#         self.path_to_aggNet='./aggNet/aggNetBlock_dim1_199.pt'
+        self.path_to_aggNet='./aggNet/aggNetBlock_cifar_dirichlet_dim1_20.pt'        
         out=self.deepGAR(clients)
         return out    
     def net_aggNetBlocksMultiple(self,clients):
@@ -181,6 +208,40 @@ class Server():
         self.path_to_aggNet='./aggNet/aggNetBlockMultiple_dim1_199.pt'
         out=self.deepGAR(clients)
         return out    
+    
+    def net_aggNet_Blocks_normalize(self,clients):
+        from aggNet_Blocks_normalize import Net
+        self.Net=Net
+        self.path_to_aggNet='./aggNet/aggNetBlockNormalize_dim1_79.pt'
+        out=self.deepGAR(clients)
+        return out    
+    def net_irlsNeuralSort(self,clients):
+        from nnsort import Net
+        self.Net=Net
+        self.path_to_aggNet='./aggNet/GeometricMedian_dim1_132.pt'
+        out=self.deepGAR(clients)
+        return out
+    def geometricMedian(self,clients):
+        from geometricMedian import Net
+        self.Net=Net
+        out=self.FedFuncWholeNet(clients , lambda arr: Net().cuda()(arr.cuda()))
+        return out   
+    def krum(self,clients):
+        from multiKrum import Net
+        self.Net=Net
+        out=self.FedFuncWholeNet(clients , lambda arr: Net('krum').cuda()(arr.cuda()))
+        return out   
+    def mkrum(self,clients):
+        from multiKrum import Net
+        self.Net=Net
+        out=self.FedFuncWholeNet(clients , lambda arr: Net('mkrum').cuda()(arr.cuda()))
+        return out   
+    
+    def net_attention(self,clients):
+        from aggregator.attention import Net
+        out=self.FedFuncWholeStateDict(clients , Net().main)
+        return out   
+    
     def FedFunc(self,clients,func=torch.mean):
         '''
         apply func to each paramters across clients
@@ -190,6 +251,8 @@ class Server():
 
         for param in Delta:
             if not "FloatTensor" in Delta[param].type():
+                print(f'Skip aggregating non-float parameters:{param}')
+                Delta[param]=deltas[0][param]
                 continue
             ##stacking the weight in the innerest dimension
             param_stack=torch.stack([delta[param] for delta in deltas],-1)
@@ -212,10 +275,21 @@ class Server():
             param_stack=torch.stack([delta[param] for delta in deltas],-1)
             shaped=param_stack.view(-1,len(clients))
             Delta[param]=shaped
+            
+        saveAsPCA=True
+        if saveAsPCA:
+            import convert_pca
+            proj_vec=convert_pca._convertWithPCA(Delta)
+            savepath=f'{self.savePath}/pca_{self.GAR.__name__}_{self.iter}.pt'
+            torch.save(proj_vec,savepath)
+            return
         savepath=f'{self.savePath}/{self.GAR.__name__}_{self.iter}.pt'
         
         torch.save(Delta,savepath)
         print(f'Weight delta has been saved to {savepath}')
+        
+        
+        
     def FedFuncNbhPerLayer(self,clients,func=torch.mean,vd=1):
         '''
         apply func to each layer across clients
@@ -242,6 +316,8 @@ class Server():
             
         for param in Delta:
             if not "FloatTensor" in Delta[param].type():
+                print(f'Skip aggregating non-float parameters:{param}')
+                Delta[param]=deltas[0][param]
                 continue
             ##stacking the weight in the innerest dimension
             ## size of layer x1x number of clients
@@ -272,6 +348,8 @@ class Server():
 
         for param in Delta:
             if not "FloatTensor" in Delta[param].type():
+                print(f'Skip aggregating non-float parameters:{param}')
+                Delta[param]=deltas[0][param]
                 continue
             ##stacking the weight in the innerest dimension
             ## size of layer x1x number of clients
@@ -288,4 +366,50 @@ class Server():
 #             buffer=func(shaped).reshape(Delta[param].shape)
             Delta[param]=buffer
         return Delta
+    def FedFuncPerLayer_1_batch(self,clients,func=torch.mean):
+        '''
+        apply func to each layer across clients
+        '''
+        Delta=deepcopy(self.emptyStates)
+        deltas=[c.getDelta() for c in clients]
+
+        for param in Delta:
+            if not "FloatTensor" in Delta[param].type():
+                print(f'Skip aggregating non-float parameters:{param}')
+                Delta[param]=deltas[0][param]
+                continue
+            ##stacking the weight in the innerest dimension
+            ## size of layer x1x number of clients
+            param_stack=torch.stack([delta[param].cpu() for delta in deltas],-1) # d1 x d2 x d3 x... xnum clients
+            shaped=param_stack.view(1,-1,len(clients)) #d1*d2*d3*... x 1 x num clients
+            result_tensor=func(shaped)
+            buffer=result_tensor.reshape(Delta[param].shape)
+            ##applying `func` to the [n by params] tensor in the innerest dimension
+#             buffer=func(shaped).reshape(Delta[param].shape)
+            Delta[param]=buffer
+        return Delta        
+    def FedFuncWholeNet(self,clients,func):
+        Delta=deepcopy(self.emptyStates)
+        deltas=[c.getDelta() for c in clients]
+
+        vecs=[utils.net2vec(delta) for delta in deltas]
+        result=func(torch.stack(vecs,1).unsqueeze(0)) #input as 1 by d by n
+        result=result.view(-1)
+        param_float=utils.getFloatSubModules(Delta)        
+        
+        for param in Delta:
+            if param not in param_float:
+                print(f'Skip aggregating non-float parameters:{param}')
+                Delta[param]=deltas[0][param]
+                
+        utils.vec2net(result,Delta)
+        return Delta
     
+    def FedFuncWholeStateDict(self,clients,func):
+        Delta=deepcopy(self.emptyStates)
+        deltas=[c.getDelta() for c in clients]
+        
+        resultDelta=func(deltas)
+
+        Delta.update(resultDelta)        
+        return Delta

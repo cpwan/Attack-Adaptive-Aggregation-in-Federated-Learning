@@ -38,6 +38,7 @@ class Net(nn.Module):
  
         self.local = torch.nn.Sequential(
                         block(self.in_dim,64),
+#                         block(64,64),
                     )
         self.MLP = torch.nn.Sequential(
                         block_no_activation(64,1)

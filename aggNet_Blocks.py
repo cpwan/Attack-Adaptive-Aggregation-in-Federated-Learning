@@ -48,12 +48,27 @@ class pointNetBlock(nn.Module):
         '''
         x    : batch size x window dim x num clients x 1
         '''
-        x=x.view(-1,self.in_dim,self.n,1)
+        out= self.forward_n(x,self.n)
+        return out
+#         x=x.view(-1,self.in_dim,self.n,1)
+
+#         x = self.local(x)
+#         x_local=x
+#         x = self.globa(x)
+#         x_globa=x.repeat(1,1,self.n,1)
+
+#         x=torch.cat([x_local,x_globa],dim=1)
+#         x=self.MLP(x)
+# #         x=x.squeeze()
+#         out=x
+#         return out
+    def forward_n(self,x,n):
+        x=x.view(-1,self.in_dim,n,1)
 
         x = self.local(x)
         x_local=x
         x = self.globa(x)
-        x_globa=x.repeat(1,1,self.n,1)
+        x_globa=x.repeat(1,1,n,1)
 
         x=torch.cat([x_local,x_globa],dim=1)
         x=self.MLP(x)
@@ -105,8 +120,26 @@ class Net(nn.Module):
         return x, pred_softmax, pred_binary
      
     def forward_n(self, input, n):
-        self.n=n
-        self.forward(input)
+        '''
+        input: batch size x window dim x n
+        '''
+        x=input.view(-1,self.in_dim,n,1)
+        median=torch.median(x,dim=2)[0]
+        x=x-median[:,:,None,:]
+        
+        x=self.main[0].forward_n(x,n)
+        x=self.main[1](x)
+        x=self.main[2].forward_n(x,n)
+#        x = F.softmax(x,dim=1)
+        x=x.squeeze()
+        x = torch.sigmoid(x)
+#         pred=dot_product(input,x).squeeze(-1)
+        x2= F.softmax(x,dim=1)
+        x3 = (x>0.5).float().to(input)
+        x3 = x3/(torch.sum(x3,-1).view(-1,1)+1e-14)
+        pred_softmax = torch.sum(x2.view(-1,1,n)*input,dim=-1).unsqueeze(-1)
+        pred_binary = torch.sum(x3.view(-1,1,n)*input,dim=-1).unsqueeze(-1)
+        return x, pred_softmax, pred_binary
 
 if __name__ == '__main__':
     vd=1
