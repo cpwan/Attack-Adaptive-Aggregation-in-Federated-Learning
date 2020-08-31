@@ -77,7 +77,7 @@ if __name__ == '__main__':
     print("\n#Initialize dataloaders")
     loader_types=['iid','byLabel','dirichlet']
     for i in range(len(loader_types)):
-        loader=train_dataloader(10,loader_types[i],store=False)
+        loader=train_dataloader(20,loader_types[i],store=False)
         print(f"Initialized {len(loader)} loaders (type: {loader_types[i]}), each with batch size {loader.bsz}.\
         \nThe size of dataset in each loader are:")
         print([len(loader[i].dataset) for i in range(len(loader))])

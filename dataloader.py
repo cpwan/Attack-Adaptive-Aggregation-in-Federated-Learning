@@ -107,8 +107,7 @@ class dirichletLoader(customDataLoader):
         for i in self.labels:            
             label_iloc=(label==i).nonzero().squeeze().numpy()
             np.random.shuffle(label_iloc)
-            part_probability=np.random.dirichlet([self.alpha]*self.size)
-            p=np.random.dirichlet([0.9]*10)
+            p=np.random.dirichlet([self.alpha]*self.size)
             # choose which partition a data is assigned to
             assignment=np.random.choice(range(self.size),size=len(label_iloc),p=p.tolist())
             part_list=[(label_iloc[(assignment==i)]).tolist() for i in range(self.size)]
