@@ -18,12 +18,11 @@ class Backdoor_Utils():
     
     def __init__(self):
         self.backdoor_label = 2
-        self.trigger_position =[[0, 0, 0], [0, 0, 1], [0, 0, 2],
+        self.trigger_position = [[0, 0, 0], [0, 0, 1], [0, 0, 2],
                                 [0, 0, 4], [0, 0, 5], [0, 0, 6],
                                 [0, 2, 0], [0, 2, 1], [0, 2, 2],
-                                [0, 2, 4], [0, 2, 5], [0, 2, 6],
-                                ]
-        self.trigger_value= [1,1,1,1,1,1,1,1,1,1,1,1,]
+                                [0, 2, 4], [0, 2, 5], [0, 2, 6],]
+        self.trigger_value = [1,1,1,1,1,1,1,1,1,1,1,1,]
 
     def get_poison_batch(self, data, targets, backdoor_fraction, backdoor_label, evaluation=False):
 #         poison_count = 0

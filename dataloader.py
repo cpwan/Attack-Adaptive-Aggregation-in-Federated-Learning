@@ -16,7 +16,7 @@ class Partition(torch.utils.data.Dataset):
     def __init__(self, data, index):
         self.data = data
         self.index = index
-        self.classes =0
+        self.classes = 0
     def __len__(self):
         return len(self.index)
 
@@ -33,13 +33,13 @@ class customDataLoader():
         dataset: pytorch dataset
         bsz: batch size of the data loader
         '''
-        self.size=size
-        self.dataset=dataset
-        self.classes=np.unique(dataset.targets).tolist()
-        self.bsz=bsz
-        self.partition_list=self.getPartitions() 
-        num_unique_items=len(np.unique(np.concatenate(self.partition_list)))
-        if (len(dataset)!=num_unique_items):
+        self.size = size
+        self.dataset = dataset
+        self.classes = np.unique(dataset.targets).tolist()
+        self.bsz = bsz
+        self.partition_list = self.getPartitions() 
+        num_unique_items = len(np.unique(np.concatenate(self.partition_list)))
+        if (len(dataset) != num_unique_items):
             print(f"Number of unique items in partitions ({num_unique_items}) is not equal to the size of dataset ({len(dataset)}), some data may not be included")
         
     def getPartitions(self):
@@ -49,11 +49,10 @@ class customDataLoader():
         return self.size
     
     def __getitem__(self,rank):
-        assert rank<self.size, 'partition index should be smaller than the size of the partition'
+        assert rank < self.size, 'partition index should be smaller than the size of the partition'
         partition = Partition(self.dataset, self.partition_list[rank])
-        partition.classes=self.classes
-        train_set = torch.utils.data.DataLoader(
-            partition, batch_size=int(self.bsz), shuffle=True, drop_last=True) #drop last since some network requires batchnorm
+        partition.classes = self.classes
+        train_set = torch.utils.data.DataLoader(partition, batch_size=int(self.bsz), shuffle=True, drop_last=True) #drop last since some network requires batchnorm
         return train_set   
 
     
@@ -67,7 +66,7 @@ class iidLoader(customDataLoader):
         # fractions of data in each partition
         partition_sizes = [1.0 / self.size for _ in range(self.size)] 
 
-        partition_list=[]
+        partition_list = []
         for frac in partition_sizes:
             part_len = int(frac * data_len)
             partition_list.append(indexes[0:part_len])
@@ -80,37 +79,37 @@ class byLabelLoader(customDataLoader):
     def getPartitions(self):
         data_len = len(self.dataset)
         
-        partition_list=[]
-        self.labels=np.unique(self.dataset.targets).tolist()
-        label=self.dataset.targets
-        label=torch.tensor(np.array(label))
+        partition_list = []
+        self.labels = np.unique(self.dataset.targets).tolist()
+        label = self.dataset.targets
+        label = torch.tensor(np.array(label))
         for i in self.labels:            
-            label_iloc=(label==i).nonzero().squeeze().tolist()
+            label_iloc = (label == i).nonzero().squeeze().tolist()
             partition_list.append(label_iloc)
         return partition_list
     
 class dirichletLoader(customDataLoader):
     def __init__(self,size,dataset,alpha=0.9,bsz=128):
-        # alpha is used in getPartition, 
+        # alpha is used in getPartition,
         # and getPartition is used in parent constructor
         # hence need to initialize alpha first
-        self.alpha=alpha 
+        self.alpha = alpha 
         super(dirichletLoader,self).__init__(size,dataset,bsz)
         
     def getPartitions(self):
         data_len = len(self.dataset)
         
-        partition_list=[[] for j in range(self.size)]
-        self.labels=np.unique(self.dataset.targets).tolist()
-        label=self.dataset.targets
-        label=torch.tensor(np.array(label))
+        partition_list = [[] for j in range(self.size)]
+        self.labels = np.unique(self.dataset.targets).tolist()
+        label = self.dataset.targets
+        label = torch.tensor(np.array(label))
         for i in self.labels:            
-            label_iloc=(label==i).nonzero().squeeze().numpy()
+            label_iloc = (label == i).nonzero().squeeze().numpy()
             np.random.shuffle(label_iloc)
-            p=np.random.dirichlet([self.alpha]*self.size)
+            p = np.random.dirichlet([self.alpha] * self.size)
             # choose which partition a data is assigned to
-            assignment=np.random.choice(range(self.size),size=len(label_iloc),p=p.tolist())
-            part_list=[(label_iloc[(assignment==i)]).tolist() for i in range(self.size)]
+            assignment = np.random.choice(range(self.size),size=len(label_iloc),p=p.tolist())
+            part_list = [(label_iloc[(assignment == i)]).tolist() for i in range(self.size)]
             for j in range(self.size):
                 partition_list[j]+=part_list[j]
         return partition_list
@@ -119,28 +118,25 @@ class dirichletLoader(customDataLoader):
 if __name__ == '__main__':
     from torchvision import datasets, transforms
 
-    dataset=datasets.MNIST(
-                './data',
+    dataset = datasets.MNIST('./data',
                 train=True,
                 download=True,
-                transform=transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Normalize((0.1307, ), (0.3081, ))
-                ]))
-    loader=iidLoader(10,dataset)
+                transform=transforms.Compose([transforms.ToTensor(),
+                    transforms.Normalize((0.1307,), (0.3081,))]))
+    loader = iidLoader(10,dataset)
     print(f"\nInitialized {len(loader)} loaders, each with batch size {loader.bsz}.\
     \nThe size of dataset in each loader are:")
     print([len(loader[i].dataset) for i in range(len(loader))])
     print(f"Total number of data: {sum([len(loader[i].dataset) for i in range(len(loader))])}")
 
     
-    loader=byLabelLoader(10,dataset)
+    loader = byLabelLoader(10,dataset)
     print(f"\nInitialized {len(loader)} loaders, each with batch size {loader.bsz}.\
     \nThe size of dataset in each loader are:")
     print([len(loader[i].dataset) for i in range(len(loader))])
     print(f"Total number of data: {sum([len(loader[i].dataset) for i in range(len(loader))])}")
     
-    loader=dirichletLoader(10,dataset,alpha=0.9)
+    loader = dirichletLoader(10,dataset,alpha=0.9)
     print(f"\nInitialized {len(loader)} loaders, each with batch size {loader.bsz}.\
     \nThe size of dataset in each loader are:")
     print([len(loader[i].dataset) for i in range(len(loader))])

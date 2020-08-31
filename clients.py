@@ -8,28 +8,28 @@ from copy import deepcopy
 
 class Client():
     def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
-        self.cid=cid
-        self.model=model
-        self.dataLoader=dataLoader
-        self.optimizer=optimizer
-        self.device=device
-        self.log_interval=len(dataLoader)-1
+        self.cid = cid
+        self.model = model
+        self.dataLoader = dataLoader
+        self.optimizer = optimizer
+        self.device = device
+        self.log_interval = len(dataLoader) - 1
         self.init_stateChange()
-        self.originalState=deepcopy(model.state_dict())
-        self.isTrained=False
-        self.inner_epochs=inner_epochs
-        self.criterion=criterion
+        self.originalState = deepcopy(model.state_dict())
+        self.isTrained = False
+        self.inner_epochs = inner_epochs
+        self.criterion = criterion
         
         
     def init_stateChange(self):
-        states=deepcopy(self.model.state_dict())
+        states = deepcopy(self.model.state_dict())
         for param,values in states.items():
             values*=0
-        self.stateChange=states
+        self.stateChange = states
         
     def setModelParameter(self,states):
         self.model.load_state_dict(deepcopy(states))
-        self.originalState=deepcopy(states)
+        self.originalState = deepcopy(states)
         self.model.zero_grad()
         
     def data_transform(self,data,target):
@@ -47,7 +47,7 @@ class Client():
                 loss = self.criterion(output, target)
                 loss.backward()
                 self.optimizer.step()
-        self.isTrained=True
+        self.isTrained = True
         self.model.cpu() ## avoid occupying gpu when idle
         
     def test(self,testDataLoader):
@@ -67,18 +67,20 @@ class Client():
         self.model.cpu() ## avoid occupying gpu when idle
 ## Uncomment to print the test scores of each client
 #         writer.add_scalar('test/loss', test_loss, steps)
-#         writer.add_scalar('test/accuracy', correct / len(testDataLoader.dataset), steps)
+                        #         writer.add_scalar('test/accuracy', correct /
+                        #         len(testDataLoader.dataset), steps)
 
-#         print('client {} ##  Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(self.cid,
+#         print('client {} ## Test set: Average loss: {:.4f}, Accuracy: {}/{}
+#         ({:.0f}%)'.format(self.cid,
 #             test_loss, correct, len(testDataLoader.dataset),
-#             100. * correct / len(testDataLoader.dataset)))
+#             100.  * correct / len(testDataLoader.dataset)))
         
         
     def update(self):
         assert self.isTrained, 'nothing to update, call train() to obtain gradients'
-        newState=self.model.state_dict()
+        newState = self.model.state_dict()
         for param in self.originalState:
-            self.stateChange[param]=newState[param]-self.originalState[param]
-        self.isTrained=False
+            self.stateChange[param] = newState[param] - self.originalState[param]
+        self.isTrained = False
     def getDelta(self):
         return self.stateChange

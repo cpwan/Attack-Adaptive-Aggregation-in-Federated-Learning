@@ -21,28 +21,28 @@ def getKrum(input):
         mkrum : batchsize* vector dimension * 1
     '''
     
-    n=input.shape[-1]
-    f=n//2 #worse case 50% malicious points
-    k=n-f-2
+    n = input.shape[-1]
+    f = n // 2 #worse case 50% malicious points
+    k = n - f - 2
 
     #collection distance, distance from points to points
-    x=input.permute(0,2,1)
-    cdist=torch.cdist(x,x,p=2)
+    x = input.permute(0,2,1)
+    cdist = torch.cdist(x,x,p=2)
     #find the k+1 nbh of each point
-    nbhDist,nbh=torch.topk(cdist,k+1,largest=False)
+    nbhDist,nbh = torch.topk(cdist,k + 1,largest=False)
     #the point closest to its nbh
-    i_star=torch.argmin(nbhDist.sum(2))
+    i_star = torch.argmin(nbhDist.sum(2))
     #krum
-    krum=input[:,:,[i_star]]
+    krum = input[:,:,[i_star]]
     #Multi-Krum
-    mkrum=input[:,:,nbh[:,i_star,:].view(-1)].mean(2,keepdims=True)
+    mkrum = input[:,:,nbh[:,i_star,:].view(-1)].mean(2,keepdims=True)
     return krum, mkrum
 
 class Net(nn.Module):
     def __init__(self, mode='mkrum'):
         super(Net, self).__init__()
-        assert( mode in ['krum','mkrum'])
-        self.mode=mode
+        assert(mode in ['krum','mkrum'])
+        self.mode = mode
 
     def forward(self, input):
 #         print(input.shape)
@@ -54,7 +54,7 @@ class Net(nn.Module):
         '''
         krum, mkrum = getKrum(input)
         
-        out= krum if self.mode=='krum' else mkrum
+        out = krum if self.mode == 'krum' else mkrum
         
         return out
      

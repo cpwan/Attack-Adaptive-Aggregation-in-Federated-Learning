@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument("--dataset",            type=str,   choices=["mnist","cifar","cifar100"], default ="mnist")
     parser.add_argument("--loader_type",        type=str,   choices=["iid","byLabel","dirichlet"], default ="iid")
     parser.add_argument("--loader_path",        type=str,   default = "./data/loader.pk", help="where to save the data partitions")
-    parser.add_argument("--GAR",                type=str,   )
+    parser.add_argument("--GAR",                type=str,)
     parser.add_argument("--n_attacker_backdoor",      type=int, default=0)
     parser.add_argument("--n_attacker_semanticBackdoor",      type=int, default=0)
     parser.add_argument("--n_attacker_labelFlipping", type=int, default=0)
@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument("--save_model_weights", action="store_true")
     parser.add_argument("--experiment_name",    type=str)
     parser.add_argument("--path_to_aggNet",    type=str)
-    args=parser.parse_args()
+    args = parser.parse_args()
               
     n = args.num_clients
 
@@ -46,18 +46,18 @@ def parse_args():
     m = args.n_attacker_omniscient
     args.attacker_list_omniscient = np.random.permutation(list(range(n)))[:m]
                         
-    if args.experiment_name==None:
-        args.experiment_name=f"{args.loader_type}/{args.attacks}/{args.GAR}"
+    if args.experiment_name == None:
+        args.experiment_name = f"{args.loader_type}/{args.attacks}/{args.GAR}"
                         
     return args
                         
-if __name__=="__main__":
+if __name__ == "__main__":
     
     import _main
-    args=parse_args()
-    print("#"*64)
+    args = parse_args()
+    print("#" * 64)
     for i in vars(args):
         print(f"#{i:>40}: {str(getattr(args,i)):<20}#")
-    print("#"*64)     
+    print("#" * 64)     
     _main.main(args)
                         

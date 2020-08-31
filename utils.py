@@ -1,21 +1,21 @@
 import torch
 from copy import deepcopy
-def getFloatSubModules(Delta)->list:
-    param_float=[]
+def getFloatSubModules(Delta) -> list:
+    param_float = []
     for param in Delta:
         if not "FloatTensor" in Delta[param].type(): 
             continue
         param_float.append(param)
     return param_float
-def getNetMeta(Delta)->(dict,dict):
+def getNetMeta(Delta) -> (dict,dict):
     '''
     get the shape and number of elements in each modules of Delta
     get the module components of type float and otherwise 
     '''
-    shapes=dict(((k,v.shape) for (k,v) in Delta.items()))
-    sizes=dict(((k,v.numel()) for (k,v) in Delta.items()))
+    shapes = dict(((k,v.shape) for (k,v) in Delta.items()))
+    sizes = dict(((k,v.numel()) for (k,v) in Delta.items()))
     return shapes,sizes
-def vec2net(vec: torch.Tensor, net)-> None:
+def vec2net(vec: torch.Tensor, net) -> None:
     '''
     convert a 1 dimension Tensor to state dict
     
@@ -26,14 +26,14 @@ def vec2net(vec: torch.Tensor, net)-> None:
     return
     None
     '''
-    param_float=getFloatSubModules(net)
-    shapes,sizes=getNetMeta(net)
-    partition=list(sizes[param] for param in param_float)
-    flattenComponents=dict(zip(param_float,torch.split(vec,partition)))
-    components=dict(((k,v.reshape(shapes[k])) for (k,v) in flattenComponents.items()))
+    param_float = getFloatSubModules(net)
+    shapes,sizes = getNetMeta(net)
+    partition = list(sizes[param] for param in param_float)
+    flattenComponents = dict(zip(param_float,torch.split(vec,partition)))
+    components = dict(((k,v.reshape(shapes[k])) for (k,v) in flattenComponents.items()))
     net.update(components)
 
-def net2vec(net)-> (torch.Tensor):
+def net2vec(net) -> (torch.Tensor):
     '''
     convert state dict to a 1 dimension Tensor
     
@@ -42,12 +42,12 @@ def net2vec(net)-> (torch.Tensor):
     return
     vec : torch.Tensor with shape(d), d is the number of Float elements in `Delta`
     '''
-    param_float=getFloatSubModules(net)
+    param_float = getFloatSubModules(net)
 
-    components=[]
+    components = []
     for param in param_float:
         components.append(net[param])        
-    vec=torch.cat([component.flatten() for component in components ])
+    vec = torch.cat([component.flatten() for component in components ])
     return vec
 
 
@@ -62,13 +62,13 @@ def applyWeight2StateDicts(deltas,weight):
         Delta: a state dict with its submodules being weighted by `weight`         
     
     '''
-    Delta=deepcopy(deltas[0])
-    param_float=getFloatSubModules(Delta)
+    Delta = deepcopy(deltas[0])
+    param_float = getFloatSubModules(Delta)
 
     for param in param_float:
         Delta[param]*=0
         for i in range(len(deltas)):
-            Delta[param]+=deltas[i][param]*weight[i].item()
+            Delta[param]+=deltas[i][param] * weight[i].item()
     
     return Delta
 
@@ -87,43 +87,43 @@ def stackStateDicts(deltas):
                 then stacked["conv.weight"]] has shape torch.shape(10*10,n), and
                 stacked["conv.weight"]][:,i] is equal to deltas[i]["conv.weight"].flatten()
     '''
-    stacked=deepcopy(deltas[0])
+    stacked = deepcopy(deltas[0])
     for param in stacked:
-        stacked[param]=None    
+        stacked[param] = None    
     for param in stacked:
-        param_stack=torch.stack([delta[param] for delta in deltas],-1)
-        shaped=param_stack.view(-1,len(deltas))
-        stacked[param]=shaped
+        param_stack = torch.stack([delta[param] for delta in deltas],-1)
+        shaped = param_stack.view(-1,len(deltas))
+        stacked[param] = shaped
     return stacked
 
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     from cifar import Net
 
-    netA=Net().state_dict()
-    netB=Net().state_dict()
+    netA = Net().state_dict()
+    netB = Net().state_dict()
     for param in netB:
         netB[param]*=0
 
     def getNumUnequalModules(netA,netB):
-        count=0
+        count = 0
         for param in netA:
-            res=torch.all(netA[param]==netB[param])
-            if res!=True:
+            res = torch.all(netA[param] == netB[param])
+            if res != True:
                 count+=1
         return count
     print("before conversion")
     print("Number of unequal modules:\t", getNumUnequalModules(netA,netB))
 
-    vec=net2vec(netA)
+    vec = net2vec(netA)
     vec2net(vec,netB)
 
-    param_float=getFloatSubModules(netA)
+    param_float = getFloatSubModules(netA)
     for param in netA:
         if param in param_float:
             continue
-        netB[param]=netA[param]
+        netB[param] = netA[param]
 
     print("After conversion")
     print("Number of unequal modules:\t", getNumUnequalModules(netA,netB))
