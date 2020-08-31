@@ -150,17 +150,17 @@ class Server():
     def geometricMedian(self,clients):
         from geometricMedian import Net
         self.Net = Net
-        out = self.FedFuncWholeNet(clients , lambda arr: Net().cuda()(arr.cuda()))
+        out = self.FedFuncWholeNet(clients , lambda arr: Net().to(self.device)(arr.to(self.device)))
         return out   
     def krum(self,clients):
         from multiKrum import Net
         self.Net = Net
-        out = self.FedFuncWholeNet(clients , lambda arr: Net('krum').cuda()(arr.cuda()))
+        out = self.FedFuncWholeNet(clients , lambda arr: Net('krum').to(self.device)(arr.to(self.device)))
         return out   
     def mkrum(self,clients):
         from multiKrum import Net
         self.Net = Net
-        out = self.FedFuncWholeNet(clients , lambda arr: Net('mkrum').cuda()(arr.cuda()))
+        out = self.FedFuncWholeNet(clients , lambda arr: Net('mkrum').to(self.device)(arr.to(self.device)))
         return out   
     
     def net_attention(self,clients):
