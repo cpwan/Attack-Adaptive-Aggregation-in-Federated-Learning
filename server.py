@@ -199,23 +199,26 @@ class Server():
         Delta = deepcopy(self.emptyStates)
         deltas = [c.getDelta() for c in clients]
 
+        # get all trainable parameter in the state dict
+        param_trainable=utils.getTrainableParameters(self.model)
+        for delta in deltas:
+            delta=dict(((param,delta[param]) for param in param_trainable))
+
+
         vecs = [utils.net2vec(delta) for delta in deltas]
         result = func(torch.stack(vecs,1).unsqueeze(0)) #input as 1 by d by n
-        result = result.view(-1)
-        param_float = utils.getFloatSubModules(Delta)        
-        
-        for param in Delta:
-            if param not in param_float:
-                print(f'Skip aggregating non-float parameters:{param}')
-                Delta[param] = deltas[0][param]
-                
+        result = result.view(-1)                
         utils.vec2net(result,Delta)
         return Delta
     
     def FedFuncWholeStateDict(self,clients,func):
         Delta = deepcopy(self.emptyStates)
         deltas = [c.getDelta() for c in clients]
-        
+        # get all trainable parameter in the state dict
+        param_trainable=utils.getTrainableParameters(self.model)
+        for delta in deltas:
+            delta=dict(((param,delta[param]) for param in param_trainable))
+
         resultDelta = func(deltas)
 
         Delta.update(resultDelta)        

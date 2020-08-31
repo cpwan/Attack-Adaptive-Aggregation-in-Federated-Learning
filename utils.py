@@ -1,5 +1,13 @@
 import torch
 from copy import deepcopy
+
+def getTrainableParameters(net) -> list:
+    trainableParam=[]
+    for name, param in net.named_parameters():
+        if param.requires_grad:
+            trainableParam.append(name)
+    return trainableParam
+
 def getFloatSubModules(Delta) -> list:
     param_float = []
     for param in Delta:
