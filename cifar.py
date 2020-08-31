@@ -16,8 +16,7 @@ def Net():
     model.fc=nn.Linear(n,10)
     return model
 
-
-def basic_loader(num_clients,loader_type):
+def getDataset():
     dataset=datasets.CIFAR10(
         './data',
         train=True,
@@ -26,10 +25,14 @@ def basic_loader(num_clients,loader_type):
             transforms.ToTensor(),
             transforms.Normalize((0.5,0.5,0.5 ), (0.5,0.5,0.5 ))
         ]))
+    return dataset
+
+def basic_loader(num_clients,loader_type):
+    dataset=getDataset()
     return loader_type(num_clients,dataset)
 
 def train_dataloader(num_clients,loader_type='iid' ,store=True,path='./data/loader.pk'):
-    assert loader_type in ['iid','byLabel','dirichlet'], 'Loader has to be either \'iid\' or \'non_overlap_label \''
+    assert loader_type in ['iid','byLabel','dirichlet'], 'Loader has to be one of the  \'iid\',\'byLabel\',\'dirichlet\''
     if loader_type=='iid':
         loader_type=iidLoader
     elif loader_type=='byLabel':

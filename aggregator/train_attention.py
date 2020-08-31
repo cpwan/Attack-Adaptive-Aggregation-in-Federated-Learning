@@ -1,10 +1,13 @@
+import sys,os
+sys.path.append(os.getcwd())
+print(sys.path)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 import math
 from aggregator.attention import AttentionLoop
-import utils
 from torch.utils.data import Dataset, DataLoader,ConcatDataset
 
 
@@ -112,6 +115,44 @@ class FLdata(Dataset):
 
 if __name__=="__main__":
     
+
+    
+    import argparse
+    # defined command line options
+    # this also generates --help and error handling
+    parser=argparse.ArgumentParser(fromfile_prefix_chars='@')
+    parser.add_argument("--path_prefix",type=str, help="for example: ./AggData/dirichlet/cifar/")    
+    parser.add_argument("--save_path",type=str, help="for example: ./aggregator/attention.pt")
+    parser.add_argument(
+      "--train_path",  
+      nargs="+",  
+      type=str,
+      help="for example: No_Attack(0)"
+    )
+    parser.add_argument(
+      "--test_path",
+      nargs="+",
+      type=str,
+      help="for example: No_Attack(1)"
+    )
+
+
+    args=parser.parse_args()
+    
+    print(args.path_prefix)
+    print(args.save_path)
+    print(args.train_path)
+    print(args.test_path)
+    path_prefix=args.path_prefix
+    save_path=args.save_path
+    train_path=args.train_path
+    test_path=args.test_path
+
+    
+    
+    
+    
+#     exit(0)
     import allocateGPU
     allocateGPU.allocate_gpu()
     
@@ -121,18 +162,18 @@ if __name__=="__main__":
 
 
 
-    path_prefix="./AggData/dirichlet/cifar/"
-    path_to_folder_list= ["No_Attack(0)","backdoor_1(0)","backdoor_2(0)","backdoor_3(0)","backdoor_4(0)",]
+#     path_prefix="./AggData/dirichlet/cifar/"
+#     train_path= ["No_Attack(0)","backdoor_1(0)","backdoor_2(0)","backdoor_3(0)","backdoor_4(0)",]
     
-    test_path_to_folder_list=["No_Attack(1)","backdoor_1(1)","backdoor_2(1)","backdoor_3(1)","backdoor_4(1)",\
-                              "No_Attack(2)","backdoor_1(2)","backdoor_2(2)","backdoor_3(2)","backdoor_4(2)",\
-                              "No_Attack(3)","backdoor_1(3)","backdoor_2(3)","backdoor_3(3)","backdoor_4(3)",]
+#     test_path=["No_Attack(1)","backdoor_1(1)","backdoor_2(1)","backdoor_3(1)","backdoor_4(1)",\
+#                               "No_Attack(2)","backdoor_1(2)","backdoor_2(2)","backdoor_3(2)","backdoor_4(2)",\
+#                               "No_Attack(3)","backdoor_1(3)","backdoor_2(3)","backdoor_3(3)","backdoor_4(3)",]
 
-    # path_to_folder_list=["./backdoor_1(0)","./backdoor_2(0)","./backdoor_3(0)","./backdoor_4(0)",]
+    # train_path=["./backdoor_1(0)","./backdoor_2(0)","./backdoor_3(0)","./backdoor_4(0)",]
 
-    trainDataset=ConcatDataset([FLdata(path_prefix+path_to_folder,list(range(20))) for path_to_folder in path_to_folder_list])
-    validDataset=ConcatDataset([FLdata(path_prefix+path_to_folder,list(range(21,30))) for path_to_folder in path_to_folder_list])
-    testDataset=ConcatDataset([FLdata(path_prefix+path_to_folder,list(range(0,30))) for path_to_folder in test_path_to_folder_list])
+    trainDataset=ConcatDataset([FLdata(path_prefix+path_to_folder,list(range(20))) for path_to_folder in train_path])
+    validDataset=ConcatDataset([FLdata(path_prefix+path_to_folder,list(range(21,30))) for path_to_folder in train_path])
+    testDataset=ConcatDataset([FLdata(path_prefix+path_to_folder,list(range(0,30))) for path_to_folder in test_path])
 
 
     dataloader = DataLoader(trainDataset, batch_size=4, shuffle=True)
@@ -207,4 +248,4 @@ for i in range(epochs):
     train_acc.append(train_score)
     valid_acc.append(valid_score)
     test_acc.append(test_score)
-torch.save(model.state_dict(),"./aggregator/attention.pt")
+torch.save(model.state_dict(),save_path)

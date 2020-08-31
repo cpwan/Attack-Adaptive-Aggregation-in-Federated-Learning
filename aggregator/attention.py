@@ -22,7 +22,7 @@ class nonLinearity(nn.Module):
         return out
 
 class Affinity(nn.Module):
-    def __init__(self, in_channels, out_channels, bias=False):
+    def __init__(self, in_channels, out_channels, bias=False, self_attention=True):
         super(Affinity, self).__init__()
 
         ##baseline
@@ -30,7 +30,10 @@ class Affinity(nn.Module):
         # self.query_conv = nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=bias)
         ##non linearity
         self.key_conv = nonLinearity(in_channels, out_channels, bias=bias)
-        self.query_conv = nonLinearity(in_channels, out_channels, bias=bias)
+        if self_attention:
+            self.query_conv=self.key_conv
+        else:
+            self.query_conv = nonLinearity(in_channels, out_channels, bias=bias)
 
     def forward(self,query,key):
         q_out = self.query_conv(query)
@@ -85,7 +88,7 @@ class AttentionLoop(nn.Module):
 class Net():
     def __init__(self):
         self.hidden_size=11
-        self.path_to_net="./aggregator/attention.pt"
+        self.path_to_net="./aggregator/attention_sb.pt"
     
     def main(self,deltas:list):
         '''
@@ -119,10 +122,3 @@ class Net():
 
 
         return Delta
-if __name__=="__main__":
-    import torch
-    delta={"a":torch.Tensor([[1,2,3],[4,5,6]])}
-    deltas=[delta]*10
-    deltas[0]={"a":torch.Tensor([[0,2,3],[4,5,6]])}
-    result=main(deltas)
-    print(result)

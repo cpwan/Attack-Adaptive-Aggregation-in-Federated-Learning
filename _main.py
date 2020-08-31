@@ -23,7 +23,7 @@ def main(args):
     print('#####################')
     print('#####################')
     print('#####################')
-    print(f'Gradient Aggregation Rule:\t{args.GAR}\nData distribution:\t{args.loader_type}\nAttacks:\t{args.attacks} ')
+    print(f'Aggregation Rule:\t{args.GAR}\nData distribution:\t{args.loader_type}\nAttacks:\t{args.attacks} ')
     print('#####################')
     print('#####################')
     print('#####################')
@@ -53,7 +53,7 @@ def main(args):
         Net=cifar.Net
         criterion=F.cross_entropy
     #create server instance
-    model0 = Net().to(device)
+    model0 = Net()
     server=Server(model0,testData,criterion,device)
     server.set_GAR(args.GAR)
     server.path_to_aggNet=args.path_to_aggNet
@@ -74,6 +74,9 @@ def main(args):
             label[i]=0
         for i in args.attacker_list_backdoor:
             label[i]=0
+        for i in args.attacker_list_semanticBackdoor:
+            label[i]=0
+        
         torch.save(label,f'{server.savePath}/label.pt')
     #create clients instance
     
@@ -81,8 +84,9 @@ def main(args):
     attacker_list_omniscient              =args.attacker_list_omniscient
     attacker_list_backdoor                =args.attacker_list_backdoor
     attacker_list_labelFlippingDirectional=args.attacker_list_labelFlippingDirectional
+    attacker_list_semanticBackdoor        =args.attacker_list_semanticBackdoor
     for i in range(args.num_clients):
-        model = Net().to(device)
+        model = Net()
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
         if i in attacker_list_labelFlipping:
             client_i=Attacker_LabelFlipping(i,model,trainData[i],optimizer,criterion,device)
@@ -92,6 +96,8 @@ def main(args):
             client_i=Attacker_Omniscient(i,model,trainData[i],optimizer,criterion,device,args.omniscient_scale)
         elif i in attacker_list_backdoor:
             client_i=Attacker_Backdoor(i,model,trainData[i],optimizer,criterion,device)
+        elif i in attacker_list_semanticBackdoor:
+            client_i=Attacker_SemanticBackdoor(i,model,trainData[i],optimizer,criterion,device)
         else:
             client_i=Client(i,model,trainData[i],optimizer,criterion,device)
         server.attach(client_i)
@@ -101,11 +107,31 @@ def main(args):
     writer.add_scalar('test/loss', loss, steps)
     writer.add_scalar('test/accuracy', accuracy, steps)
     
+    
+    
     if 'BACKDOOR' in args.attacks.upper():
-        loss,accuracy=server.test_backdoor()
+        if 'SEMANTIC' in args.attacks.upper():
+            loss,accuracy,bdata,bpred=server.test_semanticBackdoor()
+#             import torchvision
+#             import matplotlib.pyplot as plt
+#             def imshow(img):
+#                 img=img.cpu()
+#                 img = img / 2 + 0.5     # unnormalize
+#                 npimg = img.numpy()
+#                 plt.imshow(np.transpose(npimg, (1, 2, 0)))
+#             fig=plt.figure(figsize=(10,10))
+#             imshow(torchvision.utils.make_grid(bdata))
+            
+#             writer.add_figure('backdoor samples and prediction',fig,steps)
+#             print(bpred)
+        else:
+            loss,accuracy=server.test_backdoor()
 
         writer.add_scalar('test/loss_backdoor', loss, steps)
         writer.add_scalar('test/backdoor_success_rate', accuracy, steps)
+        
+        
+        
     for j in range(args.epochs):        
         steps=j+1
         
@@ -122,9 +148,25 @@ def main(args):
         writer.add_scalar('test/loss', loss, steps)
         writer.add_scalar('test/accuracy', accuracy, steps)
         
-        if 'BACKDOOR' in args.attacks.upper():
-            loss,accuracy=server.test_backdoor()
 
+        if 'BACKDOOR' in args.attacks.upper():
+            if 'SEMANTIC' in args.attacks.upper():
+                loss,accuracy,bdata,bpred=server.test_semanticBackdoor()
+#                 import torchvision
+#                 def imshow(img):
+#                     img=img.cpu()
+#                     img = img / 2 + 0.5     # unnormalize
+#                     npimg = img.numpy()
+#                     plt.imshow(np.transpose(npimg, (1, 2, 0)))
+#                 fig=plt.figure(figsize=(10,10))
+#                 imshow(torchvision.utils.make_grid(bdata))
+
+#                 writer.add_figure('backdoor samples and prediction',fig,steps)
+#                 print(bpred)
+                
+            else:
+                loss,accuracy=server.test_backdoor()
+                
             writer.add_scalar('test/loss_backdoor', loss, steps)
             writer.add_scalar('test/backdoor_success_rate', accuracy, steps)
         

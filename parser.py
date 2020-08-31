@@ -5,7 +5,7 @@ import numpy as np
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size",         type=int,   default = 64)
-    parser.add_argument("--test_batch_size",    type=int,   default = 1000)
+    parser.add_argument("--test_batch_size",    type=int,   default = 64)
     parser.add_argument("--epochs",             type=int,   default = 10)
     parser.add_argument("--lr",                 type=float, default = 0.01, help="Learning rate of models")
     parser.add_argument("--momentum",           type=float, default = 0.5)
@@ -18,6 +18,7 @@ def parse_args():
     parser.add_argument("--loader_path",        type=str,   default = "./data/loader.pk", help="where to save the data partitions")
     parser.add_argument("--GAR",                type=str,   )
     parser.add_argument("--n_attacker_backdoor",      type=int, default=0)
+    parser.add_argument("--n_attacker_semanticBackdoor",      type=int, default=0)
     parser.add_argument("--n_attacker_labelFlipping", type=int, default=0)
     parser.add_argument("--n_attacker_labelFlippingDirectional", type=int, default=0)
     parser.add_argument("--n_attacker_omniscient",    type=int, default=0)
@@ -32,7 +33,10 @@ def parse_args():
 
     m = args.n_attacker_backdoor
     args.attacker_list_backdoor = np.random.permutation(list(range(n)))[:m]
-
+    
+    m = args.n_attacker_semanticBackdoor
+    args.attacker_list_semanticBackdoor = np.random.permutation(list(range(n)))[:m]
+    
     m = args.n_attacker_labelFlipping
     args.attacker_list_labelFlipping = np.random.permutation(list(range(n)))[:m]
 

@@ -6,6 +6,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from copy import deepcopy
 from backdoor_utils import Backdoor_Utils
+from backdoor_semantic_utils import SemanticBackdoor_Utils
+
 import utils
 path_to_aggNet="./aggNet/aggNet_dim64_199.pt"
 
@@ -38,6 +40,7 @@ class Server():
         for c in self.clients:
             c.setModelParameter(self.model.state_dict())
     def test(self):
+        self.model.to(self.device)
         self.model.eval()
         test_loss = 0
         correct = 0
@@ -52,12 +55,13 @@ class Server():
                 count += pred.shape[0]
         test_loss /= count
         accuracy=100. * correct / count
-
+        self.model.cpu() ## avoid occupying gpu when idle
         print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
             test_loss, correct, count, accuracy))
         return test_loss,accuracy
     
     def test_backdoor(self):
+        self.model.to(self.device)
         self.model.eval()
         test_loss = 0
         correct = 0
@@ -73,10 +77,34 @@ class Server():
 
         test_loss /= len(self.dataLoader.dataset)
         accuracy=100. * correct / len(self.dataLoader.dataset)
-
+        
+        self.model.cpu() ## avoid occupying gpu when idle
         print('\nTest set (Backdoored): Average loss: {:.4f}, Success rate: {}/{} ({:.0f}%)\n'.format(
             test_loss, correct, len(self.dataLoader.dataset), accuracy))
         return test_loss,accuracy
+    
+    def test_semanticBackdoor(self):
+        self.model.to(self.device)
+        self.model.eval()
+        test_loss = 0
+        correct = 0
+        utils=SemanticBackdoor_Utils()
+        with torch.no_grad():
+            for data, target in self.dataLoader:
+                data, target = utils.get_poison_batch(data, target, backdoor_fraction=1, backdoor_label=utils.backdoor_label, evaluation=True)
+                data, target = data.to(self.device), target.to(self.device)
+                output = self.model(data)
+                test_loss += self.criterion(output, target, reduction='sum').item() # sum up batch loss
+                pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
+                correct += pred.eq(target.view_as(pred)).sum().item()
+
+        test_loss /= len(self.dataLoader.dataset)
+        accuracy=100. * correct / len(self.dataLoader.dataset)
+        
+        self.model.cpu() ## avoid occupying gpu when idle
+        print('\nTest set (Semantic Backdoored): Average loss: {:.4f}, Success rate: {}/{} ({:.0f}%)\n'.format(
+            test_loss, correct, len(self.dataLoader.dataset), accuracy))
+        return test_loss,accuracy, data, pred
     
         
     def train(self,group):
@@ -93,10 +121,10 @@ class Server():
         for param in self.model.state_dict():
             self.model.state_dict()[param]+=Delta[param]
         self.iter+=1
-    def worker(self,c):
-        c.train()
-        c.update()
-        return c
+#     def worker(self,c):
+#         c.train()
+#         c.update()
+#         return c
  
         
     def set_GAR(self,gar):
@@ -132,9 +160,11 @@ class Server():
             raise ValueError("Not a valid aggregation rule or aggregation rule not implemented")
 
     def FedAvg(self,clients):
-        return self.FedFunc(clients,func=torch.mean)
+        out =self.FedFuncWholeNet(clients , lambda arr: torch.mean(arr,dim=-1,keepdim=True))
+        return out#self.FedFunc(clients,func=torch.mean)
     def FedMedian(self,clients):
-        return self.FedFunc(clients,func=torch.median)
+        out =self.FedFuncWholeNet(clients , lambda arr: torch.median(arr,dim=-1,keepdim=True)[0])
+        return out#self.FedFunc(clients,func=torch.mean)
     
     def load_deep_net(self):
         

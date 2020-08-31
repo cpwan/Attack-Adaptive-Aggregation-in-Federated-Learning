@@ -10,7 +10,7 @@ from random import Random
 from itertools import compress
 import numpy as np
 
-class Partition():
+class Partition(torch.utils.data.Dataset):
     """ Dataset-like object, but only access a subset of it. """
 
     def __init__(self, data, index):

@@ -19,6 +19,8 @@ class Client():
         self.isTrained=False
         self.inner_epochs=inner_epochs
         self.criterion=criterion
+        
+        
     def init_stateChange(self):
         states=deepcopy(self.model.state_dict())
         for param,values in states.items():
@@ -34,6 +36,7 @@ class Client():
         return data,target
     
     def train(self):
+        self.model.to(self.device)
         self.model.train()
         for epoch in range(self.inner_epochs):
             for batch_idx, (data, target) in enumerate(self.dataLoader):
@@ -45,9 +48,10 @@ class Client():
                 loss.backward()
                 self.optimizer.step()
         self.isTrained=True
+        self.model.cpu() ## avoid occupying gpu when idle
         
     def test(self,testDataLoader):
-
+        self.model.to(self.device)
         self.model.eval()
         test_loss = 0
         correct = 0
@@ -60,6 +64,7 @@ class Client():
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
         test_loss /= len(testDataLoader)
+        self.model.cpu() ## avoid occupying gpu when idle
 ## Uncomment to print the test scores of each client
 #         writer.add_scalar('test/loss', test_loss, steps)
 #         writer.add_scalar('test/accuracy', correct / len(testDataLoader.dataset), steps)
