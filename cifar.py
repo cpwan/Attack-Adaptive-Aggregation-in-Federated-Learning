@@ -8,12 +8,12 @@ from torchvision import datasets, transforms
 from torchvision.models.resnet import resnet18
 from dataloader import *
 import pickle
-from setups.resnet import ResNet18
 
 def Net():
+    num_classes=10
     model = resnet18(pretrained=True)
     n=model.fc.in_features
-    model.fc=nn.Linear(n,10)
+    model.fc=nn.Linear(n,num_classes)
     return model
 
 def getDataset():
