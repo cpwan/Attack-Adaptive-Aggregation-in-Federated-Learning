@@ -13,7 +13,7 @@ def parse_args():
     parser.add_argument("--log_interval",       type=int,   default = 11)
     parser.add_argument("-n","--num_clients",   type=int,   default = 10)
     parser.add_argument("--output_folder",      type=str,   default = "experiments", help="path to output folder, e.g. \"experiment\"")
-    parser.add_argument("--dataset",            type=str,   choices=["mnist","cifar"], default ="mnist")
+    parser.add_argument("--dataset",            type=str,   choices=["mnist","cifar","cifar100"], default ="mnist")
     parser.add_argument("--loader_type",        type=str,   choices=["iid","byLabel","dirichlet"], default ="iid")
     parser.add_argument("--loader_path",        type=str,   default = "./data/loader.pk", help="where to save the data partitions")
     parser.add_argument("--GAR",                type=str,   )

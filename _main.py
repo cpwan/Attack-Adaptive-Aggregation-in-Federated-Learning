@@ -12,6 +12,7 @@ from tensorboardX import SummaryWriter
 
 import mnist
 import cifar
+import cifar100
 from server import Server
 from clients import Client
 from modules import Net
@@ -52,6 +53,12 @@ def main(args):
         testData=cifar.test_dataloader(args.test_batch_size)
         Net=cifar.Net
         criterion=F.cross_entropy
+    elif args.dataset=='cifar100':
+        trainData=cifar100.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
+        testData=cifar100.test_dataloader(args.test_batch_size)
+        Net=cifar100.Net
+        criterion=F.cross_entropy
+
     #create server instance
     model0 = Net()
     server=Server(model0,testData,criterion,device)
