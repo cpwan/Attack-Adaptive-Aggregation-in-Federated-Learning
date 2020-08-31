@@ -34,7 +34,7 @@ def main(args):
     
     
  
-    device = 'cuda'
+    device = args.device
     allocate_gpu()
     
     attacks = args.attacks

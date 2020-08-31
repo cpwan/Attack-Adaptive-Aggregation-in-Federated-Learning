@@ -27,6 +27,7 @@ def parse_args():
     parser.add_argument("--save_model_weights", action="store_true")
     parser.add_argument("--experiment_name",    type=str)
     parser.add_argument("--path_to_aggNet",    type=str)
+    parser.add_argument("--device",    type=str, choices=["cuda","cpu"], default='cuda')
     args = parser.parse_args()
               
     n = args.num_clients
