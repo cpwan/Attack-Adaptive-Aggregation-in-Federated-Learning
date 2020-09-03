@@ -9,22 +9,12 @@ from backdoor_utils import Backdoor_Utils
 from backdoor_semantic_utils import SemanticBackdoor_Utils
 import numpy as np
 import random
-labels = torch.tensor([0,1,2,3,4,5,6,7,8,9])
-class Attacker_LabelFlipping(Client):
-    def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
-        super(Attacker_LabelFlipping, self).__init__(cid,model,dataLoader,optimizer,criterion, device ,inner_epochs)
-    def data_transform(self,data,target):
-        labels = self.dataLoader.dataset.classes
-        target_ = torch.tensor(list(map(lambda x: random.choice([i for i in labels if i != x]),target)))
-        assert target.shape == target_.shape, "Inconsistent target shape"
-        return data,target_    
-    
+
 class Attacker_LabelFlipping1to7(Client):
     def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
         super(Attacker_LabelFlipping1to7, self).__init__(cid,model,dataLoader,optimizer,criterion, device ,inner_epochs)
     def data_transform(self,data,target):
-        labels = self.dataLoader.dataset.classes
-        target_ = torch.tensor(list(map(lambda x: labels[7] if x == labels[1] else x,target)))
+        target_ = torch.tensor(list(map(lambda x: 7 if x == 1 else x,target)))
         assert target.shape == target_.shape, "Inconsistent target shape"
         return data,target_
 

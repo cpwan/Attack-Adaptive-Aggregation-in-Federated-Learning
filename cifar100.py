@@ -64,10 +64,9 @@ def test_dataloader(test_batch_size):
 if __name__ == '__main__':
     print("#Initialize a network")
     net = Net()
-    batch_size = 100
-    y = net((torch.randn(batch_size,3,32,32)))
-    print(f"Output shape of the network with batchsize {batch_size}:\t {y.size()}")
-    
+    summary(net.cuda(), (3,32,32))
+
+
     print("\n#Initialize dataloaders")
     loader_types = ['iid','byLabel','dirichlet']
     for i in range(len(loader_types)):
@@ -78,6 +77,6 @@ if __name__ == '__main__':
         print(f"Total number of data: {sum([len(loader[i].dataset) for i in range(len(loader))])}")
     
     print("\n#Feeding data to network")
-    x = next(iter(loader[i]))[0]
+    x = next(iter(loader[i]))[0].cuda()
     y = net(x)
     print(f"Size of input:  {x.shape} \nSize of output: {y.shape}")

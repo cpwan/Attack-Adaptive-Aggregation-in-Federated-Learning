@@ -1,9 +1,12 @@
 import torch
 from copy import deepcopy
 
-def getTrainableParameters(net) -> list:
-    trainableParam=[]
-    for name, param in net.named_parameters():
+def getTrainableParameters(model) -> list:
+    '''
+    model: torch module
+    '''
+    trainableParam = []
+    for name, param in model.named_parameters():
         if param.requires_grad:
             trainableParam.append(name)
     return trainableParam
