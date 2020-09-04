@@ -62,7 +62,7 @@ def main(args):
         trainData = imdb.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
         testData = imdb.test_dataloader(args.test_batch_size)
         Net = imdb.Net
-        criterion = F.cross_entropy
+        criterion = F.binary_cross_entropy_with_logits
 
     #create server instance
     model0 = Net()

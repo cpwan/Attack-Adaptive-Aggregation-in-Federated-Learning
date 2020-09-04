@@ -51,7 +51,10 @@ class Server():
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 test_loss += self.criterion(output, target, reduction='sum').item() # sum up batch loss
-                pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
+                if output.dim()==1:
+                    pred = torch.round(torch.sigmoid(output))
+                else:
+                    pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
                 count += pred.shape[0]
         test_loss /= count
