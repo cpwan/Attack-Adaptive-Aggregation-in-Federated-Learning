@@ -1,3 +1,6 @@
+from allocateGPU import *
+allocate_gpu()
+
 import parser
 import _main
 if __name__ == "__main__":

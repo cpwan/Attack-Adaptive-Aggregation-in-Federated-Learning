@@ -16,7 +16,6 @@ import cifar100
 import imdb
 from server import Server
 from clients import Client
-from allocateGPU import *
 from clients_attackers import *
 
 def main(args):
@@ -36,7 +35,6 @@ def main(args):
     
  
     device = args.device
-    allocate_gpu()
     
     attacks = args.attacks
     

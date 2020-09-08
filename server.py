@@ -153,17 +153,17 @@ class Server():
     def geometricMedian(self,clients):
         from geometricMedian import Net
         self.Net = Net
-        out = self.FedFuncWholeNet(clients , lambda arr: Net().to(self.device)(arr.to(self.device)))
+        out = self.FedFuncWholeNet(clients , lambda arr: Net().cpu()(arr.cpu()))
         return out   
     def krum(self,clients):
         from multiKrum import Net
         self.Net = Net
-        out = self.FedFuncWholeNet(clients , lambda arr: Net('krum').to(self.device)(arr.to(self.device)))
+        out = self.FedFuncWholeNet(clients , lambda arr: Net('krum').cpu()(arr.cpu()))
         return out   
     def mkrum(self,clients):
         from multiKrum import Net
         self.Net = Net
-        out = self.FedFuncWholeNet(clients , lambda arr: Net('mkrum').to(self.device)(arr.to(self.device)))
+        out = self.FedFuncWholeNet(clients , lambda arr: Net('mkrum').cpu()(arr.cpu()))
         return out   
     
     def net_attention(self,clients):
@@ -177,13 +177,18 @@ class Server():
         Delta = deepcopy(self.emptyStates)
         deltas = [c.getDelta() for c in clients]
 
-        for param in Delta:
-            if not "FloatTensor" in Delta[param].type():
-                continue
+        param_trainable=utils.getTrainableParameters(self.model)
+
+        param_nontrainable=[param for param in Delta.keys() if param not in param_trainable]
+        for param in param_nontrainable:
+            del Delta[param]
+        print(f"Saving the model weight of the trainable paramters:\n {Delta.keys()}")
+        for param in param_trainable:
             ##stacking the weight in the innerest dimension
             param_stack = torch.stack([delta[param] for delta in deltas],-1)
             shaped = param_stack.view(-1,len(clients))
             Delta[param] = shaped
+
             
         saveAsPCA = True
         if saveAsPCA:
