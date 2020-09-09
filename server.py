@@ -121,11 +121,39 @@ class Server():
         for param in self.model.state_dict():
             self.model.state_dict()[param]+=Delta[param]
         self.iter+=1
-#     def worker(self,c):
-#         c.train()
-#         c.update()
-#         return c
- 
+        
+    def saveChanges(self, clients):
+        
+        Delta = deepcopy(self.emptyStates)
+        deltas = [c.getDelta() for c in clients]
+
+        param_trainable=utils.getTrainableParameters(self.model)
+
+        param_nontrainable=[param for param in Delta.keys() if param not in param_trainable]
+        for param in param_nontrainable:
+            del Delta[param]
+        print(f"Saving the model weight of the trainable paramters:\n {Delta.keys()}")
+        for param in param_trainable:
+            ##stacking the weight in the innerest dimension
+            param_stack = torch.stack([delta[param] for delta in deltas],-1)
+            shaped = param_stack.view(-1,len(clients))
+            Delta[param] = shaped
+
+            
+        saveAsPCA = True
+        if saveAsPCA:
+            import convert_pca
+            proj_vec = convert_pca._convertWithPCA(Delta)
+            savepath = f'{self.savePath}/pca_{self.iter}.pt'
+            torch.save(proj_vec,savepath)
+            print(f'The PCA projections of Weight delta has been saved to {savepath} (with shape {proj_vec.shape})')
+            return
+        savepath = f'{self.savePath}/{self.iter}.pt'
+        
+        torch.save(Delta,savepath)
+        print(f'Weight delta has been saved to {savepath}')
+
+    ## Aggregation functions ##
         
     def set_GAR(self,gar):
         if   gar == 'fedavg':
@@ -172,35 +200,7 @@ class Server():
         return out   
 
     
-    def saveChanges(self, clients):
-        
-        Delta = deepcopy(self.emptyStates)
-        deltas = [c.getDelta() for c in clients]
-
-        param_trainable=utils.getTrainableParameters(self.model)
-
-        param_nontrainable=[param for param in Delta.keys() if param not in param_trainable]
-        for param in param_nontrainable:
-            del Delta[param]
-        print(f"Saving the model weight of the trainable paramters:\n {Delta.keys()}")
-        for param in param_trainable:
-            ##stacking the weight in the innerest dimension
-            param_stack = torch.stack([delta[param] for delta in deltas],-1)
-            shaped = param_stack.view(-1,len(clients))
-            Delta[param] = shaped
-
-            
-        saveAsPCA = True
-        if saveAsPCA:
-            import convert_pca
-            proj_vec = convert_pca._convertWithPCA(Delta)
-            savepath = f'{self.savePath}/pca_{self.GAR.__name__}_{self.iter}.pt'
-            torch.save(proj_vec,savepath)
-            return
-        savepath = f'{self.savePath}/{self.GAR.__name__}_{self.iter}.pt'
-        
-        torch.save(Delta,savepath)
-        print(f'Weight delta has been saved to {savepath}')
+    ## Helper functions, act as adaptor from aggregation function to the federated learning system##
         
         
     def FedFuncWholeNet(self,clients,func):

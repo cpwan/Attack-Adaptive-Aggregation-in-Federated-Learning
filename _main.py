@@ -45,7 +45,7 @@ def main(args):
         trainData = mnist.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
         testData = mnist.test_dataloader(args.test_batch_size)
         Net = mnist.Net
-        criterion = F.nll_loss
+        criterion = F.cross_entropy
     elif args.dataset == 'cifar':
         trainData = cifar.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
         testData = cifar.test_dataloader(args.test_batch_size)
@@ -69,11 +69,11 @@ def main(args):
     server.path_to_aggNet = args.path_to_aggNet
     if args.save_model_weights:
         server.isSaveChanges = True
-        server.savePath = f'./AggData/{args.loader_type}/{args.dataset}/{args.attacks}'
+        server.savePath = f'./AggData/{args.loader_type}/{args.dataset}/{args.attacks}/{args.GAR}'
         from pathlib import Path
         Path(server.savePath).mkdir(parents=True, exist_ok=True)
         '''
-        honest clients are labeled 1, malicious clients are labeled 0
+        honest clients are labeled as 1, malicious clients are labeled as 0
         '''
         label = torch.ones(10)
         for i in args.attacker_list_labelFlipping:
