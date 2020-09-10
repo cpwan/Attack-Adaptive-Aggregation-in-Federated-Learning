@@ -97,7 +97,10 @@ def main(args):
     attacker_list_semanticBackdoor = args.attacker_list_semanticBackdoor
     for i in range(args.num_clients):
         model = Net()
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+        if args.optimizer=='SGD':
+            optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+        elif args.optimizer=='Adam':
+            optimizer = optim.Adam(model.parameters(), lr=args.lr*0.1)
         if i in attacker_list_labelFlipping:
             client_i = Attacker_LabelFlipping(i,model,trainData[i],optimizer,criterion,device)
         elif i in attacker_list_labelFlippingDirectional:

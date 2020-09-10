@@ -7,6 +7,7 @@ def parse_args():
     parser.add_argument("--batch_size",         type=int,   default = 64)
     parser.add_argument("--test_batch_size",    type=int,   default = 64)
     parser.add_argument("--epochs",             type=int,   default = 10)
+    parser.add_argument("--optimizer",          type=str,   default = 'SGD')
     parser.add_argument("--lr",                 type=float, default = 0.01, help="Learning rate of models")
     parser.add_argument("--momentum",           type=float, default = 0.5)
     parser.add_argument("--seed",               type=int,   default = 1)
