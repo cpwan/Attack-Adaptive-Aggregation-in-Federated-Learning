@@ -1,5 +1,5 @@
 import sys
-importos
+import os
 sys.path.append(os.getcwd())
 print(sys.path)
 
@@ -15,7 +15,7 @@ from torch.utils.data import Dataset, DataLoader,ConcatDataset
 
 def getTensorData(path_to_folder,idx):
 
-    data = torch.load(f'{path_to_folder}/pca_FedAvg_{idx}.pt')
+    data = torch.load(f'{path_to_folder}/pca_{idx}.pt')
     label = torch.load(f'{path_to_folder}/label.pt') 
 
     perm = torch.randperm(len(label))
@@ -35,7 +35,7 @@ def getTensorData(path_to_folder,idx):
 
 # getting a hard prediction by binarizing the affinity matrix
 def getBinaryPred(model,x,beta):
-    weight = model.attention.affinity(beta,x)
+    weight = model.getWeight(beta,x)
     weight = torch.nn.Threshold(0.5 * 1.0 / weight.shape[-1],0)(weight)
     weight = F.normalize(weight,p=1,dim=-1)
     predB = torch.einsum('bqi,bji -> bjq', weight, x)
@@ -90,7 +90,7 @@ def test_classes(model,testloader):
         beta = x.median(dim=-1,keepdim=True)[0]
 
 
-        weight = model.attention.affinity(beta,x)
+        weight = model.getWeight(beta,x)
         weight = torch.nn.Threshold(0.5 * 1.0 / weight.shape[-1],0)(weight)
         weight = (weight != 0) * 1.0
         pred = weight
@@ -132,7 +132,8 @@ if __name__ == "__main__":
       nargs="+",
       type=str,
       help="for example: No_Attack(1)")
-
+    parser.add_argument("--eps",type=float, default=0.01)    
+    parser.add_argument("--scale",type=float, default=10)    
 
     args = parser.parse_args()
     
@@ -144,9 +145,10 @@ if __name__ == "__main__":
     save_path = args.save_path
     train_path = args.train_path
     test_path = args.test_path
-
+    eps=args.eps
+    scale=args.scale
     
-    
+    print(f'train soft| train hard| valid soft|valid hard| median| mean \t\t train|valid|test', file=open(f"{eps}_{scale}.txt","w"))
     
     
 #     exit(0)
@@ -169,7 +171,7 @@ if __name__ == "__main__":
 
     k = trainDataset[0][0].shape[0]
 
-    model = AttentionLoop(k, hidden_size, nloop=5)
+    model = AttentionLoop(k, hidden_size, nloop=5,eps=eps,scale=scale)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = torch.nn.L1Loss(reduction='mean')
 
@@ -226,6 +228,8 @@ for i in range(epochs):
 
     print(f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
     accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}')
+    print(f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
+    accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}', file=open(f"{eps}_{scale}.txt","a"))
     print()
     train_loss.append(lossCounter.value())
     train_loss_hard.append(lossCounter2.value())
