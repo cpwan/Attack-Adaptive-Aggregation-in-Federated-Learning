@@ -67,6 +67,7 @@ class BERTGRUSentiment(nn.Module):
         
         #output = [batch size, out dim]
         
+        output = output.squeeze(1)
         return output
 def Net():
     bert = MobileBertModel.from_pretrained('google/mobilebert-uncased')
@@ -139,7 +140,7 @@ class IMDB(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.targets)
     def __getitem__(self, i):
-        sample = (self.dataset[i][1],self.dataset[i][0])
+        sample = (self.dataset[i][1],self.dataset[i][0].float())
         return sample
 
 

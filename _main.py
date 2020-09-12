@@ -16,7 +16,6 @@ import cifar100
 import imdb
 from server import Server
 from clients import Client
-from allocateGPU import *
 from clients_attackers import *
 
 def main(args):
@@ -36,7 +35,6 @@ def main(args):
     
  
     device = args.device
-    allocate_gpu()
     
     attacks = args.attacks
     
@@ -47,7 +45,7 @@ def main(args):
         trainData = mnist.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
         testData = mnist.test_dataloader(args.test_batch_size)
         Net = mnist.Net
-        criterion = F.nll_loss
+        criterion = F.cross_entropy
     elif args.dataset == 'cifar':
         trainData = cifar.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
         testData = cifar.test_dataloader(args.test_batch_size)
@@ -62,7 +60,7 @@ def main(args):
         trainData = imdb.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
         testData = imdb.test_dataloader(args.test_batch_size)
         Net = imdb.Net
-        criterion = F.cross_entropy
+        criterion = F.binary_cross_entropy_with_logits
 
     #create server instance
     model0 = Net()
@@ -71,11 +69,11 @@ def main(args):
     server.path_to_aggNet = args.path_to_aggNet
     if args.save_model_weights:
         server.isSaveChanges = True
-        server.savePath = f'./AggData/{args.loader_type}/{args.dataset}/{args.attacks}'
+        server.savePath = f'./AggData/{args.loader_type}/{args.dataset}/{args.attacks}/{args.GAR}'
         from pathlib import Path
         Path(server.savePath).mkdir(parents=True, exist_ok=True)
         '''
-        honest clients are labeled 1, malicious clients are labeled 0
+        honest clients are labeled as 1, malicious clients are labeled as 0
         '''
         label = torch.ones(10)
         for i in args.attacker_list_labelFlipping:
@@ -99,7 +97,10 @@ def main(args):
     attacker_list_semanticBackdoor = args.attacker_list_semanticBackdoor
     for i in range(args.num_clients):
         model = Net()
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+        if args.optimizer=='SGD':
+            optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
+        elif args.optimizer=='Adam':
+            optimizer = optim.Adam(model.parameters(), lr=args.lr*0.1)
         if i in attacker_list_labelFlipping:
             client_i = Attacker_LabelFlipping(i,model,trainData[i],optimizer,criterion,device)
         elif i in attacker_list_labelFlippingDirectional:

@@ -1,12 +1,21 @@
 import os
-import numpy as np
-import subprocess
-import torch
+lim=2
+limit=str(lim)
+os.environ["OMP_NUM_THREADS"] = limit # export OMP_NUM_THREADS=1
+os.environ["OPENBLAS_NUM_THREADS"] = limit # export OPENBLAS_NUM_THREADS=1
+os.environ["MKL_NUM_THREADS"] = limit # export MKL_NUM_THREADS=1
+os.environ["VECLIB_MAXIMUM_THREADS"] = limit # export VECLIB_MAXIMUM_THREADS=1
+os.environ["NUMEXPR_NUM_THREADS"] = limit # export NUMEXPR_NUM_THREADS=1
 
+
+import subprocess
+import numpy as np
+import torch
 
 def allocate_gpu():
     
-    allowedGPU = np.array([0])
+
+    allowedGPU = np.array([1,4,8,9])
     gpu_to_use = allowedGPU[np.argmax([int(x.split()[2]) for x in np.array(subprocess.Popen("nvidia-smi -q -d Memory | grep -A4 GPU | grep Free", shell=True, stdout=subprocess.PIPE).stdout.readlines())[allowedGPU]])]
     
     
@@ -16,8 +25,8 @@ def allocate_gpu():
     
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_to_use)
 
-    torch.set_num_threads(2)
-    os.environ["OMP_NUM_THREADS"] = str(2)
+    torch.set_num_threads(lim)
+    
     
     print('Number of gpu avaliable:\t%d' % torch.cuda.device_count())
     currentGPU = torch.cuda.current_device()

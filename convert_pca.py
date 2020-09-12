@@ -1,15 +1,28 @@
 import torch
 from utils import getFloatSubModules
-from sklearn.decomposition import PCA
+from sklearn.decomposition import TruncatedSVD as PCA
 import copy
 
+def getPCA(X,n_components):
+    out=getPCA_torch(X,n_components)
+    return out
 
-def getPCA(component, n_components):
+def getPCA_sklearn(X, n_components):
+    n_components=min(n_components,X.shape[0]-1)
     pca = PCA(n_components=n_components)
-    pca.fit(component.permute(1,0))
-    projection = pca.transform(component.permute(1,0))
+    pca.fit(X.permute(1,0))
+    projection = pca.transform(X.permute(1,0))
     out = torch.Tensor(projection.T)
     return out
+
+def getPCA_torch(X,n_components):
+    n_components=min(n_components,X.shape[0])
+    U,S,V=torch.svd(X)
+    X_=V*S
+    out=X_[:,:n_components].permute(1,0)
+    return out
+
+
 def applyToEachSubmodule(Delta,f) -> (dict):
     '''
     apply function `f` to each submodules of `Delta`
