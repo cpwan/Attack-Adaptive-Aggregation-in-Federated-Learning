@@ -51,7 +51,7 @@ class AttentionConv(nn.Module):
     def __init__(self, in_channels, out_channels, bias=False, eps=0.001, scale=10):
         super(AttentionConv, self).__init__()
 
-        self.affinity = Affinity(in_channels, out_channels, bias=False, eps=eps, scale=scale)
+        self.affinity = Affinity(in_channels, out_channels, bias=bias, eps=eps, scale=scale)
       # self.value_conv = nn.Conv1d(in_channels, in_channels, kernel_size=1,
       # bias=bias)
 
@@ -69,7 +69,7 @@ class AttentionLoop(nn.Module):
     def __init__(self, in_channels, out_channels, bias=False, nloop=2, eps=0.001, scale=10):
         super(AttentionLoop, self).__init__()
 
-        self.attention = AttentionConv(in_channels, out_channels, bias=False, eps=eps, scale=scale)
+        self.attention = AttentionConv(in_channels, out_channels, bias=bias, eps=eps, scale=scale)
         self.nloop = nloop
     def forward(self, query,key):
         x = query
@@ -88,12 +88,12 @@ class AttentionLoop(nn.Module):
 
 class Net():
     def __init__(self, eps=0.001, scale=10):
-        self.hidden_size = 11
-        self.path_to_net = "./aggregator/attention_sb.pt"
+        self.hidden_size = 21
+        self.path_to_net = "./aggregator/attention.pt"
         self.eps=eps
         self.scale=scale
     
-    def main(self,deltas:list):
+    def main(self,deltas:list,model):
         '''
         deltas: a list of state_dicts
 
@@ -102,19 +102,34 @@ class Net():
 
         '''
 
+
         
         stacked = utils.stackStateDicts(deltas)
+        
+        param_trainable=utils.getTrainableParameters(model)
+        param_nontrainable=[param for param in stacked.keys() if param not in param_trainable]
+        for param in param_nontrainable:
+            del stacked[param]
+        
         proj_vec = convert_pca._convertWithPCA(stacked)
-
-        model = AttentionLoop(proj_vec.shape[0], self.hidden_size, nloop=5, eps=self.eps/weight.shape[-1], scale=self.scale)
+        
+        
+        
+        
+        
+        print(proj_vec.shape)
+        model = AttentionLoop(proj_vec.shape[0], self.hidden_size,bias=False, nloop=5, eps=self.eps/proj_vec.shape[0], scale=self.scale)
         model.load_state_dict(torch.load(self.path_to_net))
         model.eval()
 
         
         x = proj_vec.unsqueeze(0)
         beta = x.median(dim=-1,keepdims=True)[0]
-        weight = model.attention.affinity(beta,x)
-        weight = torch.nn.Threshold(0.5 * 1.0 / weight.shape[-1],0)(weight)
+#         weight = model.attention.affinity(beta,x)
+#         weight = torch.nn.Threshold(0.5 * 1.0 / weight.shape[-1],0)(weight)
+#         weight = F.normalize(weight,p=1,dim=-1)
+        weight = model.getWeight(beta,x)
+        weight = torch.nn.Threshold( 0.8*1.0 / weight.shape[-1],0)(weight)
         weight = F.normalize(weight,p=1,dim=-1)
         
         weight = weight[0,0,:]

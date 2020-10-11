@@ -43,6 +43,7 @@ def vec2net(vec: torch.Tensor, net) -> None:
     flattenComponents = dict(zip(param_float,torch.split(vec,partition)))
     components = dict(((k,v.reshape(shapes[k])) for (k,v) in flattenComponents.items()))
     net.update(components)
+    return net
 
 def net2vec(net) -> (torch.Tensor):
     '''

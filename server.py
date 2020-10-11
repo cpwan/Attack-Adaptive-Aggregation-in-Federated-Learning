@@ -25,7 +25,7 @@ class Server():
         self.isSaveChanges = False
         self.savePath = './AggData'
         self.criterion = criterion
-        self.path_to_aggNet = "./aggNet/net.pt"
+        self.path_to_aggNet = ""
         
     def init_stateChange(self):
         states = deepcopy(self.model.state_dict())
@@ -166,6 +166,10 @@ class Server():
             self.GAR = self.krum
         elif gar == 'mkrum':
             self.GAR = self.mkrum
+        elif gar=='foolsgold':
+            self.GAR=self.foolsGold
+        elif gar=='residualbase':
+            self.GAR=self.residualBase
         elif gar == 'attention':
             self.GAR = self.net_attention
         else:
@@ -193,10 +197,22 @@ class Server():
         self.Net = Net
         out = self.FedFuncWholeNet(clients , lambda arr: Net('mkrum').cpu()(arr.cpu()))
         return out   
-    
+    def foolsGold(self,clients):
+        from foolsGold import Net
+        self.Net = Net
+        out = self.FedFuncWholeNet(clients , lambda arr: Net().cpu()(arr.cpu()))
+        return out   
+    def residualBase(self,clients):
+        from residualBase import Net
+        out = self.FedFuncWholeStateDict(clients , Net().main)
+        return out   
     def net_attention(self,clients):
         from aggregator.attention import Net
-        out = self.FedFuncWholeStateDict(clients , Net().main)
+        
+        net=Net()
+        net.path_to_net=self.path_to_aggNet
+        
+        out = self.FedFuncWholeStateDict(clients , lambda arr: net.main(arr,self.model)) 
         return out   
 
     
@@ -204,13 +220,26 @@ class Server():
         
         
     def FedFuncWholeNet(self,clients,func):
+        '''
+        The aggregation rule views the update vectors as stacked vectors (1 by d by n).
+        '''
         Delta = deepcopy(self.emptyStates)
         deltas = [c.getDelta() for c in clients]
-
         # get all trainable parameter in the state dict
-        param_trainable=utils.getTrainableParameters(self.model)
-        for delta in deltas:
-            delta=dict(((param,delta[param]) for param in param_trainable))
+#         param_trainable=utils.getTrainableParameters(self.model)
+#         for i in range(len(deltas)):
+#             deltas[i]=dict(((param,deltas[i][param]) for param in param_trainable))
+
+#         vecs = [utils.net2vec(delta) for delta in deltas]
+        
+#         #sanity check, remove update vectors with nan/inf values
+#         vecs = [vec for vec in vecs if torch.isfinite(vec).all().item()]
+#         result = func(torch.stack(vecs,1).unsqueeze(0)) #input as 1 by d by n
+#         result = result.view(-1)                
+#         utils.vec2net(result,Delta)
+#         param_trainable=utils.getTrainableParameters(self.model)
+#         for delta in deltas:
+#             delta=dict(((param,delta[param]) for param in param_trainable))
 
 
         vecs = [utils.net2vec(delta) for delta in deltas]
@@ -220,13 +249,19 @@ class Server():
         return Delta
     
     def FedFuncWholeStateDict(self,clients,func):
+        '''
+        The aggregation rule views the update vectors as a set of state dict.
+        '''
         Delta = deepcopy(self.emptyStates)
         deltas = [c.getDelta() for c in clients]
-        # get all trainable parameter in the state dict
-        param_trainable=utils.getTrainableParameters(self.model)
-        for delta in deltas:
-            delta=dict(((param,delta[param]) for param in param_trainable))
-
+#         # get all trainable parameter in the state dict
+#         param_trainable=utils.getTrainableParameters(self.model)
+#         for i in range(len(deltas)):
+#             deltas[i]=dict(((param,deltas[i][param]) for param in param_trainable))
+            
+        #sanity check, remove update vectors with nan/inf values
+        deltas=[delta for delta in deltas if torch.isfinite(utils.net2vec(delta)).all().item()]
+        
         resultDelta = func(deltas)
 
         Delta.update(resultDelta)        

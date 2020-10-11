@@ -40,7 +40,7 @@ class Attacker_SemanticBackdoor(Client):
         self.utils = SemanticBackdoor_Utils()
 
     def data_transform(self,data,target):
-        data, target = self.utils.get_poison_batch(data, target, backdoor_fraction=1.0, backdoor_label = self.utils.backdoor_label)        
+        data, target = self.utils.get_poison_batch(data, target, backdoor_fraction=0.3, backdoor_label = self.utils.backdoor_label)        
         return data,target
     def testBackdoor(self):
         self.model.to(self.device)
@@ -50,7 +50,7 @@ class Attacker_SemanticBackdoor(Client):
         utils = SemanticBackdoor_Utils()
         with torch.no_grad():
             for data, target in self.dataLoader:
-                data, target = self.utils.get_poison_batch(data, target, backdoor_fraction=0.3, backdoor_label=self.utils.backdoor_label, evaluation=True)
+                data, target = self.utils.get_poison_batch(data, target, backdoor_fraction=1.0, backdoor_label=self.utils.backdoor_label, evaluation=True)
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 test_loss += self.criterion(output, target, reduction='sum').item() # sum up batch loss

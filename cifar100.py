@@ -5,13 +5,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
-from torchvision.models.vgg import vgg13_bn
 from dataloader import *
 import pickle
 
 def Net():
     num_classes = 100
-    model = vgg13_bn(pretrained=True)
+    model = torch.hub.load('pytorch/vision:v0.6.0', 'mobilenet_v2', pretrained=True)
     n = model.classifier[-1].in_features
     model.classifier[-1] = nn.Linear(n,num_classes)
     return model
@@ -21,7 +20,7 @@ def getDataset():
         train=True,
         download=True,
         transform=transforms.Compose([transforms.ToTensor(),
-            transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))]))
+            transforms.Normalize((0.485,0.456,0.406), (0.229,0.224,0.225))]))
     return dataset
 
 def basic_loader(num_clients,loader_type):
@@ -58,7 +57,7 @@ def train_dataloader(num_clients,loader_type='iid' ,store=True,path='./data/load
 
 def test_dataloader(test_batch_size):
     test_loader = torch.utils.data.DataLoader(datasets.CIFAR100('./data', train=False, transform=transforms.Compose([transforms.ToTensor(),
-                        transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))])),
+            transforms.Normalize((0.485,0.456,0.406), (0.229,0.224,0.225))])),
     batch_size=test_batch_size, shuffle=True)
     return test_loader
 if __name__ == '__main__':

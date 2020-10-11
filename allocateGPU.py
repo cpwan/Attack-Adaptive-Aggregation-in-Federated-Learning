@@ -15,7 +15,7 @@ import torch
 def allocate_gpu():
     
 
-    allowedGPU = np.array([1,4,8,9])
+    allowedGPU = np.array([1,2,4,5,9])
     gpu_to_use = allowedGPU[np.argmax([int(x.split()[2]) for x in np.array(subprocess.Popen("nvidia-smi -q -d Memory | grep -A4 GPU | grep Free", shell=True, stdout=subprocess.PIPE).stdout.readlines())[allowedGPU]])]
     
     

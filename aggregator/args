@@ -1,7 +1,9 @@
 --path_prefix
-./
+./AggData/dirichlet/
 --save_path
 ./aggregator/attention.pt
+--log_path
+./results/ablation/
 --train_path
 mnist/No_Attack(0)/fedavg
 mnist/No_Attack(0)/gm
