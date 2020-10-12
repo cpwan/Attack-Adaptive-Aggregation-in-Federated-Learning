@@ -90,9 +90,9 @@ def initialize_parameters(m):
 def get_pretrained_embedding(initial_embedding, pretrained_vectors, vocab, unk_token):    
     pretrained_embedding = torch.FloatTensor(initial_embedding.weight.clone()).detach()  
     unk_tokens = []
-    pretrained_embedding=fasttext.lookup_vectors(vocab.itos)
-    isUnk=torch.sum(fasttext.lookup_vectors(vocab.itos)!=0,dim=1)==0
-    for idx, token in enumerate(vocab.itos):
+    pretrained_embedding=pretrained_vectors.lookup_vectors(vocab.get_itos())
+    isUnk=torch.sum(pretrained_vectors.lookup_vectors(vocab.get_itos())!=0,dim=1)==0
+    for idx, token in enumerate(vocab.get_itos()):
       if isUnk[idx]:
         unk_tokens.append(token)        
     return pretrained_embedding, unk_tokens
@@ -115,7 +115,9 @@ def loadVocab():
     print(e)
     print("Initialize a vocab")
     vocab = build_vocab_from_data(raw_train_data, tokenizer, max_size = max_size)
-    print(*vocab.itos,sep="\n",file=open("vocab.txt",'w'))
+    print(*vocab.itos(),sep="\n",file=open("vocab.txt",'w'))
+    vocab=torchtext.experimental.vocab.vocab_from_file_object(file_like_object=open("vocab.txt","r"))
+
   return vocab
 
 vocab=loadVocab()
@@ -159,7 +161,7 @@ def loadPretrainEmbedding(embedding):
     pad_token = '<pad>'
     pad_idx = vocab[pad_token]
 
-    embedding, unk_tokens = get_pretrained_embedding(model.embedding, fasttext, vocab, unk_token)
+    embedding, unk_tokens = get_pretrained_embedding(embedding, fasttext, vocab, unk_token)
     torch.save(embedding, f="fasttext.embedding")
     print("FastText embedding has been saved to \"fasttext.embedding\"")
   return embedding
