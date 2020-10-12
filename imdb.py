@@ -5,90 +5,179 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchtext
-from torchtext.experimental.vocab import vocab_from_file_object
-from transformers import MobileBertTokenizer, MobileBertModel
+import torchtext.experimental
+import torchtext.experimental.vectors
+import torchtext.experimental.vocab
+from torchtext.experimental.datasets.raw.text_classification import RawTextIterableDataset
+from torchtext.experimental.datasets.text_classification import TextClassificationDataset
+from torchtext.experimental.functional import sequential_transforms, vocab_func, totensor
 from dataloader import *
 import pickle
+import collections
 
+######### utilies for text tasks ###########
+class Tokenizer:
+  def __init__(self, tokenize_fn = 'basic_english', lower = True, max_length = None):              
+      self.tokenize_fn = torchtext.data.utils.get_tokenizer(tokenize_fn)
+      self.lower = lower
+      self.max_length = max_length              
+  def tokenize(self, s):              
+      tokens = self.tokenize_fn(s)              
+      if self.lower:
+          tokens = [token.lower() for token in tokens]                  
+      if self.max_length is not None:
+          tokens = tokens[:self.max_length]   
+          paddedTokens=['<pad>']*self.max_length
+          paddedTokens[:len(tokens)]=tokens   
+          tokens=paddedTokens
+      return tokens
 
-class BERTGRUSentiment(nn.Module):
-    '''
-    Model retrieved from
-    https://github.com/bentrevett/pytorch-sentiment-analysis/blob/master/6%20-%20Transformers%20for%20Sentiment%20Analysis.ipynb
+def build_vocab_from_data(raw_data, tokenizer, **vocab_kwargs):    
+  token_freqs = collections.Counter()          
+  for label, text in raw_data:
+      tokens = tokenizer.tokenize(text)
+      token_freqs.update(tokens)                      
+  vocab = torchtext.vocab.Vocab(token_freqs, **vocab_kwargs)          
+  return vocab
 
-    @Sep 3,2020
-    '''
-    def __init__(self,
-                 bert,
-                 hidden_dim,
-                 output_dim,
-                 n_layers,
-                 bidirectional,
-                 dropout):
-        
+def process_raw_data(raw_data, tokenizer, vocab):    
+  raw_data = [(label, text) for (label, text) in raw_data]
+  text_transform = sequential_transforms(tokenizer.tokenize,
+                                        vocab_func(vocab),
+                                        totensor(dtype=torch.long))          
+  label_transform = sequential_transforms(totensor(dtype=torch.long))
+  transforms = (label_transform, text_transform)
+  dataset = TextClassificationDataset(raw_data,
+                                      vocab,
+                                      transforms)          
+  return dataset
+
+class Collator:
+    def __init__(self, pad_idx):        
+        self.pad_idx = pad_idx        
+    def collate(self, batch):        
+        labels, text = zip(*batch)    
+        print(labels)    
+        print(text)
+        labels = torch.LongTensor(labels)        
+        lengths = torch.LongTensor([len(x) for x in text])
+        text = nn.utils.rnn.pad_sequence(text, padding_value = self.pad_idx)        
+        return labels, text, lengths
+
+def initialize_parameters(m):
+    if isinstance(m, nn.Embedding):
+        nn.init.uniform_(m.weight, -0.05, 0.05)
+    elif isinstance(m, nn.GRU):
+        for n, p in m.named_parameters():
+            if 'weight_ih' in n:
+                r, z, n = p.chunk(3)
+                nn.init.xavier_uniform_(r)
+                nn.init.xavier_uniform_(z)
+                nn.init.xavier_uniform_(n)
+            elif 'weight_hh' in n:
+                r, z, n = p.chunk(3)
+                nn.init.orthogonal_(r)
+                nn.init.orthogonal_(z)
+                nn.init.orthogonal_(n)
+            elif 'bias' in n:
+                r, z, n = p.chunk(3)
+                nn.init.zeros_(r)
+                nn.init.zeros_(z)
+                nn.init.zeros_(n)
+    elif isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight)
+        nn.init.zeros_(m.bias)
+def get_pretrained_embedding(initial_embedding, pretrained_vectors, vocab, unk_token):    
+    pretrained_embedding = torch.FloatTensor(initial_embedding.weight.clone()).detach()  
+    unk_tokens = []
+    pretrained_embedding=fasttext.lookup_vectors(vocab.itos)
+    isUnk=torch.sum(fasttext.lookup_vectors(vocab.itos)!=0,dim=1)==0
+    for idx, token in enumerate(vocab.itos):
+      if isUnk[idx]:
+        unk_tokens.append(token)        
+    return pretrained_embedding, unk_tokens
+
+## hard coded global variable ##
+
+max_length = 500
+max_size = 25_000
+
+tokenizer = Tokenizer(max_length = max_length)
+
+raw_train_data, raw_test_data  = torchtext.experimental.datasets.raw.IMDB()
+raw_train_data=RawTextIterableDataset(list(raw_train_data))
+raw_test_data=RawTextIterableDataset(list(raw_test_data))
+
+def loadVocab():
+  try:
+    vocab=torchtext.experimental.vocab.vocab_from_file_object(file_like_object=open("vocab.txt","r"))
+  except Exception as e:
+    print(e)
+    print("Initialize a vocab")
+    vocab = build_vocab_from_data(raw_train_data, tokenizer, max_size = max_size)
+    print(*vocab.itos,sep="\n",file=open("vocab.txt",'w'))
+  return vocab
+
+vocab=loadVocab()
+######### model for text tasks ###########
+
+class GRU(nn.Module):
+    def __init__(self, input_dim, emb_dim, hid_dim, output_dim, pad_idx):
         super().__init__()
-        
-        self.bert = bert
-        
-        embedding_dim = bert.config.to_dict()['hidden_size']
-        
-        self.rnn = nn.GRU(embedding_dim,
-                          hidden_dim,
-                          num_layers = n_layers,
-                          bidirectional = bidirectional,
-                          batch_first = True,
-                          dropout = 0 if n_layers < 2 else dropout)
-        
-        self.out = nn.Linear(hidden_dim * 2 if bidirectional else hidden_dim, output_dim)
-        
-        self.dropout = nn.Dropout(dropout)
-        
+
+        self.embedding = nn.Embedding(input_dim, emb_dim, padding_idx = pad_idx)
+        self.gru = nn.GRU(emb_dim, hid_dim)
+        self.fc = nn.Linear(hid_dim, output_dim)
+
     def forward(self, text):
-        
-        #text = [batch size, sent len]
-                
-        with torch.no_grad():
-            embedded = self.bert(text)[0]
-                
-        #embedded = [batch size, sent len, emb dim]
-        
-        _, hidden = self.rnn(embedded)
-        
-        #hidden = [n layers * n directions, batch size, emb dim]
-        
-        if self.rnn.bidirectional:
-            hidden = self.dropout(torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim = 1))
-        else:
-            hidden = self.dropout(hidden[-1,:,:])
-                
-        #hidden = [batch size, hid dim]
-        
-        output = self.out(hidden)
-        
-        #output = [batch size, out dim]
-        
-        output = output.squeeze(1)
-        return output
+
+        # text = [seq len, batch size]
+        # lengths = [batch size]
+        text=text.permute(1,0)
+        embedded = self.embedding(text)
+
+        # embedded = [seq len, batch size, emb dim]
+        output, hidden = self.gru(embedded)
+
+        # output = [seq_len, batch size, n directions * hid dim]
+        # hidden = [n layers * n directions, batch size, hid dim]
+
+        prediction = self.fc(hidden.squeeze(0))
+
+        # prediction = [batch size, output dim]
+
+        return prediction 
+def loadPretrainEmbedding(embedding):
+  try:
+    embedding=torch.load("fasttext.embedding")
+  except Exception as e:
+    print(e)
+    print("Initialize the embedding")
+    fasttext = torchtext.experimental.vectors.FastText(language='en', unk_tensor=None, root='.data', validate_file=True)
+
+    unk_token = '<unk>'
+    pad_token = '<pad>'
+    pad_idx = vocab[pad_token]
+
+    embedding, unk_tokens = get_pretrained_embedding(model.embedding, fasttext, vocab, unk_token)
+    torch.save(embedding, f="fasttext.embedding")
+    print("FastText embedding has been saved to \"fasttext.embedding\"")
+  return embedding
+
 def Net():
-    bert = MobileBertModel.from_pretrained('google/mobilebert-uncased')
+    input_dim = 25002 # hard code for IMDb
+    emb_dim = 300
+    hid_dim = 256
+    output_dim = 2
+    pad_token = '<pad>'
+    pad_idx = vocab[pad_token]
+    model = GRU(input_dim, emb_dim, hid_dim, output_dim, pad_idx)
+    model.apply(initialize_parameters)
 
-    HIDDEN_DIM = 256
-    OUTPUT_DIM = 1
-    N_LAYERS = 2
-    BIDIRECTIONAL = True
-    DROPOUT = 0.25
+    pretrained_embedding=loadPretrainEmbedding(model.embedding)
 
-    model = BERTGRUSentiment(bert,
-                             HIDDEN_DIM,
-                             OUTPUT_DIM,
-                             N_LAYERS,
-                             BIDIRECTIONAL,
-                             DROPOUT)
-    for name, param in model.named_parameters():                
-        if name.startswith('bert'):
-            param.requires_grad = False
-
-
+    model.embedding.weight.data.copy_(pretrained_embedding)
+    
     return model
 
 ##################################################
@@ -100,58 +189,28 @@ def Net():
 ##################################################
 class IMDB(torch.utils.data.Dataset):
     def __init__(self, train=True):
-        tokenizer = MobileBertTokenizer.from_pretrained('google/mobilebert-uncased')
-                 
-        def customTokenizer(sentence: str) -> list:
-            # keeps only the first 510 character
-            max_len = 510
-            tokens = tokenizer.tokenize(sentence)
-            tokens = ['<cls>'] + \
-                    tokens[:max_len] + \
-                    ['<sep>'] + \
-                    ['<pad>'] * max(0,max_len - len(tokens)) 
-            return tokens  
-        def getVocab(tokenizer):
-            tokenizer.save_pretrained("./")
-
-            token_old = ['[PAD]','[UNK]','[CLS]','[SEP]','[MASK]']
-            token_new = ['<pad>','<unk>','<cls>','<sep>','<mask>']
-
-            fin = open("vocab.txt", "rt")
-            data = fin.read()
-            for old,new in zip(token_old,token_new):
-                data = data.replace(old,new)
-            fin.close()
-
-            fin = open("vocab_adapted.txt", "wt")
-            fin.write(data)
-            fin.close()
-  
-            f = open('vocab_adapted.txt', 'r')
-            v = vocab_from_file_object(f)
-            return v
-
-        trainData,testData = torchtext.experimental.datasets.IMDB(vocab=getVocab(tokenizer),tokenizer=customTokenizer, data_select=('train','test'))
+        trainData = process_raw_data(raw_train_data, tokenizer, vocab)
+        testData = process_raw_data(raw_test_data, tokenizer, vocab)
         self.dataset = trainData if train == True else testData
 
-        self.targets = [sample[0] for sample in self.dataset.data] # for later use when partitioning the data
-
+        self.targets = [sample[0] for sample in self.dataset.data] # for later use when partitioning the data   
+        self.vocab=vocab
+        self.tokenizer=tokenizer
 
     def __len__(self):
         return len(self.targets)
     def __getitem__(self, i):
-        sample = (self.dataset[i][1],self.dataset[i][0].float())
+        sample = (self.dataset[i][1],self.dataset[i][0])
         return sample
 
 
 
 def getDataset(train=True):
     dataset = IMDB(train)
-
     return dataset
 
 def basic_loader(num_clients,loader_type):
-    dataset = getDataset(train=True)
+    dataset=getDataset(train=True)
     return loader_type(num_clients,dataset)
 
 def train_dataloader(num_clients,loader_type='iid' ,store=True,path='./data/loader.pk'):
@@ -191,7 +250,7 @@ if __name__ == '__main__':
     print("#Initialize a network")
     net = Net()
     batch_size = 10
-    y = net(torch.randint(30522,(batch_size,512)))
+    y = net(torch.randint(25002,(batch_size,500)))
     print(f"Output shape of the network with batchsize {batch_size}:\t {y.size()}")
     
     print("\n#Initialize dataloaders")
