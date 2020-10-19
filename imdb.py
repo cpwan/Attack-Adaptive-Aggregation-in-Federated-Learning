@@ -17,40 +17,40 @@ import collections
 
 ######### utilies for text tasks ###########
 class Tokenizer:
-  def __init__(self, tokenize_fn = 'basic_english', lower = True, max_length = None):              
-      self.tokenize_fn = torchtext.data.utils.get_tokenizer(tokenize_fn)
-      self.lower = lower
-      self.max_length = max_length              
-  def tokenize(self, s):              
-      tokens = self.tokenize_fn(s)              
-      if self.lower:
-          tokens = [token.lower() for token in tokens]                  
-      if self.max_length is not None:
-          tokens = tokens[:self.max_length]   
-          paddedTokens=['<pad>']*self.max_length
-          paddedTokens[:len(tokens)]=tokens   
-          tokens=paddedTokens
-      return tokens
+    def __init__(self, tokenize_fn = 'basic_english', lower = True, max_length = None):              
+        self.tokenize_fn = torchtext.data.utils.get_tokenizer(tokenize_fn)
+        self.lower = lower
+        self.max_length = max_length              
+    def tokenize(self, s):              
+        tokens = self.tokenize_fn(s)              
+        if self.lower:
+            tokens = [token.lower() for token in tokens]                  
+        if self.max_length is not None:
+            tokens = tokens[:self.max_length]   
+            paddedTokens=['<pad>']*self.max_length
+            paddedTokens[:len(tokens)]=tokens   
+            tokens=paddedTokens
+        return tokens
 
 def build_vocab_from_data(raw_data, tokenizer, **vocab_kwargs):    
-  token_freqs = collections.Counter()          
-  for label, text in raw_data:
-      tokens = tokenizer.tokenize(text)
-      token_freqs.update(tokens)                      
-  vocab = torchtext.vocab.Vocab(token_freqs, **vocab_kwargs)          
-  return vocab
+    token_freqs = collections.Counter()          
+    for label, text in raw_data:
+        tokens = tokenizer.tokenize(text)
+        token_freqs.update(tokens)                      
+    vocab = torchtext.vocab.Vocab(token_freqs, **vocab_kwargs)          
+    return vocab
 
 def process_raw_data(raw_data, tokenizer, vocab):    
-  raw_data = [(label, text) for (label, text) in raw_data]
-  text_transform = sequential_transforms(tokenizer.tokenize,
+    raw_data = [(label, text) for (label, text) in raw_data]
+    text_transform = sequential_transforms(tokenizer.tokenize,
                                         vocab_func(vocab),
                                         totensor(dtype=torch.long))          
-  label_transform = sequential_transforms(totensor(dtype=torch.long))
-  transforms = (label_transform, text_transform)
-  dataset = TextClassificationDataset(raw_data,
+    label_transform = sequential_transforms(totensor(dtype=torch.long))
+    transforms = (label_transform, text_transform)
+    dataset = TextClassificationDataset(raw_data,
                                       vocab,
                                       transforms)          
-  return dataset
+    return dataset
 
 class Collator:
     def __init__(self, pad_idx):        
@@ -93,32 +93,32 @@ def get_pretrained_embedding(initial_embedding, pretrained_vectors, vocab, unk_t
     pretrained_embedding=pretrained_vectors.lookup_vectors(vocab.get_itos())
     isUnk=torch.sum(pretrained_vectors.lookup_vectors(vocab.get_itos())!=0,dim=1)==0
     for idx, token in enumerate(vocab.get_itos()):
-      if isUnk[idx]:
-        unk_tokens.append(token)        
+        if isUnk[idx]:
+            unk_tokens.append(token)        
     return pretrained_embedding, unk_tokens
 
 ## hard coded global variable ##
 
-max_length = 500
-max_size = 25_000
+max_length = 200
+max_size = 25000
 
 tokenizer = Tokenizer(max_length = max_length)
 
 raw_train_data, raw_test_data  = torchtext.experimental.datasets.raw.IMDB()
 raw_train_data=RawTextIterableDataset(list(raw_train_data))
-raw_test_data=RawTextIterableDataset(list(raw_test_data))
+raw_test_data=RawTextIterableDataset(list(raw_test_data)[::5])
 
 def loadVocab():
-  try:
-    vocab=torchtext.experimental.vocab.vocab_from_file_object(file_like_object=open("vocab.txt","r"))
-  except Exception as e:
-    print(e)
-    print("Initialize a vocab")
-    vocab = build_vocab_from_data(raw_train_data, tokenizer, max_size = max_size)
-    print(*vocab.itos(),sep="\n",file=open("vocab.txt",'w'))
-    vocab=torchtext.experimental.vocab.vocab_from_file_object(file_like_object=open("vocab.txt","r"))
+    try:
+        vocab=torchtext.experimental.vocab.vocab_from_file_object(file_like_object=open("vocab.txt","r"))
+    except Exception as e:
+        print(e)
+        print("Initialize a vocab")
+        vocab = build_vocab_from_data(raw_train_data, tokenizer, max_size = max_size)
+        print(*vocab.itos,sep="\n",file=open("vocab.txt",'w'))
+        vocab=torchtext.experimental.vocab.vocab_from_file_object(file_like_object=open("vocab.txt","r"))
 
-  return vocab
+    return vocab
 
 vocab=loadVocab()
 ######### model for text tasks ###########
@@ -150,21 +150,21 @@ class GRU(nn.Module):
 
         return prediction 
 def loadPretrainEmbedding(embedding):
-  try:
-    embedding=torch.load("fasttext.embedding")
-  except Exception as e:
-    print(e)
-    print("Initialize the embedding")
-    fasttext = torchtext.experimental.vectors.FastText(language='en', unk_tensor=None, root='.data', validate_file=True)
+    try:
+        embedding=torch.load("fasttext.embedding")
+    except Exception as e:
+        print(e)
+        print("Initialize the embedding")
+        fasttext = torchtext.experimental.vectors.FastText(language='en', unk_tensor=None, root='.data', validate_file=True)
 
-    unk_token = '<unk>'
-    pad_token = '<pad>'
-    pad_idx = vocab[pad_token]
+        unk_token = '<unk>'
+        pad_token = '<pad>'
+        pad_idx = vocab[pad_token]
 
-    embedding, unk_tokens = get_pretrained_embedding(embedding, fasttext, vocab, unk_token)
-    torch.save(embedding, f="fasttext.embedding")
-    print("FastText embedding has been saved to \"fasttext.embedding\"")
-  return embedding
+        embedding, unk_tokens = get_pretrained_embedding(embedding, fasttext, vocab, unk_token)
+        torch.save(embedding, f="fasttext.embedding")
+        print("FastText embedding has been saved to \"fasttext.embedding\"")
+    return embedding
 
 def Net():
     input_dim = 25002 # hard code for IMDb
@@ -179,6 +179,7 @@ def Net():
     pretrained_embedding=loadPretrainEmbedding(model.embedding)
 
     model.embedding.weight.data.copy_(pretrained_embedding)
+    model.embedding.weight.require_grad=False
     
     return model
 

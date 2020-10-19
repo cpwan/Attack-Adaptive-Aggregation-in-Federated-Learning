@@ -63,17 +63,12 @@ class Client():
                 pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
-        test_loss /= len(testDataLoader)
+        test_loss /= len(testDataLoader.dataset)
         self.model.cpu() ## avoid occupying gpu when idle
-## Uncomment to print the test scores of each client
-#         writer.add_scalar('test/loss', test_loss, steps)
-                        #         writer.add_scalar('test/accuracy', correct /
-                        #         len(testDataLoader.dataset), steps)
-
-#         print('client {} ## Test set: Average loss: {:.4f}, Accuracy: {}/{}
-#         ({:.0f}%)'.format(self.cid,
-#             test_loss, correct, len(testDataLoader.dataset),
-#             100.  * correct / len(testDataLoader.dataset)))
+# Uncomment to print the test scores of each client
+        print('client {} ## Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(self.cid,
+            test_loss, correct, len(testDataLoader.dataset),
+            100.  * correct / len(testDataLoader.dataset)))
         
         
     def update(self):
@@ -82,5 +77,6 @@ class Client():
         for param in self.originalState:
             self.stateChange[param] = newState[param] - self.originalState[param]
         self.isTrained = False
+#         self.test(self.dataLoader)
     def getDelta(self):
         return self.stateChange

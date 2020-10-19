@@ -13,7 +13,6 @@ from tensorboardX import SummaryWriter
 import mnist
 import cifar
 import cifar100
-import imdb
 from server import Server
 from clients import Client
 from clients_attackers import *
@@ -57,10 +56,11 @@ def main(args):
         Net = cifar100.Net
         criterion = F.cross_entropy
     elif args.dataset == 'imdb':
+        import imdb
         trainData = imdb.train_dataloader(args.num_clients,loader_type=args.loader_type,path=args.loader_path, store=False)
         testData = imdb.test_dataloader(args.test_batch_size)
         Net = imdb.Net
-        criterion = F.binary_cross_entropy_with_logits
+        criterion = F.cross_entropy
 
     #create server instance
     model0 = Net()
@@ -100,19 +100,19 @@ def main(args):
         if args.optimizer=='SGD':
             optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
         elif args.optimizer=='Adam':
-            optimizer = optim.Adam(model.parameters(), lr=args.lr*0.1)
+            optimizer = optim.Adam(model.parameters(), lr=args.lr)
         if i in attacker_list_labelFlipping:
-            client_i = Attacker_LabelFlipping(i,model,trainData[i],optimizer,criterion,device)
+            client_i = Attacker_LabelFlipping01swap(i,model,trainData[i],optimizer,criterion,device,args.inner_epochs)
         elif i in attacker_list_labelFlippingDirectional:
-            client_i = Attacker_LabelFlipping1to7(i,model,trainData[i],optimizer,criterion,device)
+            client_i = Attacker_LabelFlipping1to7(i,model,trainData[i],optimizer,criterion,device,args.inner_epochs)
         elif i in attacker_list_omniscient:
-            client_i = Attacker_Omniscient(i,model,trainData[i],optimizer,criterion,device,args.omniscient_scale)
+            client_i = Attacker_Omniscient(i,model,trainData[i],optimizer,criterion,device,args.omniscient_scale,args.inner_epochs)
         elif i in attacker_list_backdoor:
-            client_i = Attacker_Backdoor(i,model,trainData[i],optimizer,criterion,device)
+            client_i = Attacker_Backdoor(i,model,trainData[i],optimizer,criterion,device,args.inner_epochs)
         elif i in attacker_list_semanticBackdoor:
-            client_i = Attacker_SemanticBackdoor(i,model,trainData[i],optimizer,criterion,device)
+            client_i = Attacker_SemanticBackdoor(i,model,trainData[i],optimizer,criterion,device,args.inner_epochs)
         else:
-            client_i = Client(i,model,trainData[i],optimizer,criterion,device)
+            client_i = Client(i,model,trainData[i],optimizer,criterion,device,args.inner_epochs)
         server.attach(client_i)
         
     loss,accuracy = server.test()

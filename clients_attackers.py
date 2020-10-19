@@ -9,6 +9,7 @@ from backdoor_utils import Backdoor_Utils
 from backdoor_semantic_utils import SemanticBackdoor_Utils
 import numpy as np
 import random
+import utils
 
 class Attacker_LabelFlipping1to7(Client):
     def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
@@ -18,6 +19,14 @@ class Attacker_LabelFlipping1to7(Client):
         assert target.shape == target_.shape, "Inconsistent target shape"
         return data,target_
 
+class Attacker_LabelFlipping01swap(Client):
+    def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
+        super(Attacker_LabelFlipping01swap, self).__init__(cid,model,dataLoader,optimizer,criterion, device ,inner_epochs)
+    def data_transform(self,data,target):
+        target_ = torch.tensor(list(map(lambda x: 1-x if x in [0,1] else x,target)))
+        assert target.shape == target_.shape, "Inconsistent target shape"
+        return data,target_
+    
 class Attacker_Backdoor(Client):
     def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
         super(Attacker_Backdoor, self).__init__(cid,model,dataLoader,optimizer,criterion, device ,inner_epochs)
@@ -35,7 +44,7 @@ class Attacker_SemanticBackdoor(Client):
     For each batch, 20 out of 64 samples (in the original paper) are replaced with semantic backdoor, this implementation replaces on average a 30% of the batch by the semantic backdoor
     
     '''
-    def __init__(self,cid,model,dataLoader,optimizer,criterion=F.nll_loss, device='cpu',inner_epochs=1):
+    def __init__(self,cid,model,dataLoader,optimizer,criterion=F.cross_entropy, device='cpu',inner_epochs=1):
         super(Attacker_SemanticBackdoor, self).__init__(cid,model,dataLoader,optimizer,criterion, device ,inner_epochs)
         self.utils = SemanticBackdoor_Utils()
 
@@ -78,7 +87,11 @@ class Attacker_Omniscient(Client):
         for param in self.originalState:
 
             self.stateChange[param] = newState[param] - self.originalState[param]
-            if not "FloatTensor" in self.originalState[param].type():
+            
+            trainable_parameter=utils.getTrainableParameters(self.model)
+            if param not in trainable_parameter:
                 continue
+#             if not "FloatTensor" in self.originalState[param].type():
+#                 continue
             self.stateChange[param]*=(-self.scale)
         self.isTrained = False

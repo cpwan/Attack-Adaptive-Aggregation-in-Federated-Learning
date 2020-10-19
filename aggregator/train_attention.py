@@ -176,6 +176,10 @@ if __name__ == "__main__":
       help="for example: No_Attack(1)")
     parser.add_argument("--eps",type=float, default=0.01)    
     parser.add_argument("--scale",type=float, default=10)    
+    parser.add_argument("--epochs",type=int, default=500)    
+    parser.add_argument("--max_round",type=int, default=30)    
+    parser.add_argument("--hidden_size",type=int, default=21)    
+    parser.add_argument("--batch_size",type=int, default=32)    
 
     args = parser.parse_args()
     
@@ -189,7 +193,10 @@ if __name__ == "__main__":
     eps=args.eps
     scale=args.scale
     log_path=args.log_path
-    
+    epochs=args.epochs
+    max_round=args.max_round
+    hidden_size = args.hidden_size
+    batch_size=args.batch_size
     print(f'train soft| train hard| valid soft|valid hard| median| mean \t\t train|valid|test', file=open(f"{log_path}{eps}_{scale}.txt","w"))
     
     
@@ -197,21 +204,19 @@ if __name__ == "__main__":
     import allocateGPU
     allocateGPU.allocate_gpu()
     
-    epochs = 1000
-    hidden_size = 21
     learning_rate = 1e-4
 
 
-    trainDataset = ConcatDataset([FLdata(path_prefix + path_to_folder,list(range(0,30))) for path_to_folder in train_path])
-    validDataset = ConcatDataset([FLdata(path_prefix + path_to_folder,list(range(21,30))) for path_to_folder in train_path])
-    testSet=[FLdata(path_prefix + path_to_folder,list(range(0,30))) for path_to_folder in test_path]
+    trainDataset = ConcatDataset([FLdata(path_prefix + path_to_folder,list(range(0,max_round))) for path_to_folder in train_path])
+    validDataset = ConcatDataset([FLdata(path_prefix + path_to_folder,list(range(max_round//3*2,max_round))) for path_to_folder in train_path])
+    testSet=[FLdata(path_prefix + path_to_folder,list(range(0,max_round))) for path_to_folder in test_path]
     testDataset = ConcatDataset(testSet)
     print(*test_path,sep=',', file=open(f"{log_path}{eps}_{scale}_long.txt","w"))
 
-    dataloader = DataLoader(trainDataset, batch_size=32, shuffle=True)
-    validloader = DataLoader(validDataset, batch_size=32, shuffle=True)
-    testloader = DataLoader(testDataset, batch_size=32, shuffle=True)
-    testloaderSeparate=[DataLoader(testItem, batch_size=30, shuffle=True) for testItem in testSet]
+    dataloader = DataLoader(trainDataset, batch_size=batch_size, shuffle=True)
+    validloader = DataLoader(validDataset, batch_size=batch_size, shuffle=True)
+    testloader = DataLoader(testDataset, batch_size=batch_size, shuffle=True)
+    testloaderSeparate=[DataLoader(testItem, batch_size=max_round, shuffle=True) for testItem in testSet]
     
     k = trainDataset[0][0].shape[0]
 
@@ -239,7 +244,8 @@ for i in range(epochs):
         x = x.cuda()
         y = y.cuda()
         c = c.cuda()
-        beta = x.median(dim=-1,keepdim=True)[0]
+        ## give a different prior to avoid over fitting
+        beta = x.median(dim=-1,keepdim=True)[0] # if (torch.rand(1)<0.5).item() else x.mean(dim=-1,keepdim=True)
 
         # loss=loss_fn(model.cuda()(x),y[:,[0],:])
         # loss=loss_fn(model.cuda()(x,x),z)

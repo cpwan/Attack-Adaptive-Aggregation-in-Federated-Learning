@@ -118,18 +118,20 @@ class Net():
         
         
         print(proj_vec.shape)
-        model = AttentionLoop(proj_vec.shape[0], self.hidden_size,bias=False, nloop=5, eps=self.eps/proj_vec.shape[0], scale=self.scale)
+        model = AttentionLoop(proj_vec.shape[0], self.hidden_size,bias=False, nloop=5, eps=self.eps, scale=self.scale)
         model.load_state_dict(torch.load(self.path_to_net))
         model.eval()
 
         
         x = proj_vec.unsqueeze(0)
         beta = x.median(dim=-1,keepdims=True)[0]
+        beta = x.mean(dim=-1,keepdims=True)
+
 #         weight = model.attention.affinity(beta,x)
 #         weight = torch.nn.Threshold(0.5 * 1.0 / weight.shape[-1],0)(weight)
 #         weight = F.normalize(weight,p=1,dim=-1)
         weight = model.getWeight(beta,x)
-        weight = torch.nn.Threshold( 0.8*1.0 / weight.shape[-1],0)(weight)
+#         weight = torch.nn.Threshold( 0.8*1.0 / weight.shape[-1],0)(weight)
         weight = F.normalize(weight,p=1,dim=-1)
         
         weight = weight[0,0,:]

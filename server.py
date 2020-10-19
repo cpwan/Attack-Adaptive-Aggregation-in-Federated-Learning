@@ -41,6 +41,7 @@ class Server():
             c.setModelParameter(self.model.state_dict())
 
     def test(self):
+        print("[Server] Start testing")
         self.model.to(self.device)
         self.model.eval()
         test_loss = 0
@@ -64,6 +65,7 @@ class Server():
         return test_loss,accuracy
     
     def test_backdoor(self):
+        print("[Server] Start testing backdoor")
         self.model.to(self.device)
         self.model.eval()
         test_loss = 0
@@ -86,6 +88,8 @@ class Server():
         return test_loss,accuracy
     
     def test_semanticBackdoor(self):
+        print("[Server] Start testing semantic backdoor")
+
         self.model.to(self.device)
         self.model.eval()
         test_loss = 0
@@ -172,6 +176,8 @@ class Server():
             self.GAR=self.residualBase
         elif gar == 'attention':
             self.GAR = self.net_attention
+        elif gar == 'mlp':
+            self.GAR = self.net_mlp
         else:
             raise ValueError("Not a valid aggregation rule or aggregation rule not implemented")
 
@@ -213,6 +219,14 @@ class Server():
         net.path_to_net=self.path_to_aggNet
         
         out = self.FedFuncWholeStateDict(clients , lambda arr: net.main(arr,self.model)) 
+        return out    
+    def net_mlp(self,clients):
+        from aggregator.mlp import Net
+        
+        net=Net()
+        net.path_to_net=self.path_to_aggNet
+        
+        out = self.FedFuncWholeStateDict(clients , lambda arr: net.main(arr,self.model)) 
         return out   
 
     
@@ -243,6 +257,7 @@ class Server():
 
 
         vecs = [utils.net2vec(delta) for delta in deltas]
+        vecs = [vec for vec in vecs if torch.isfinite(vec).all().item()]
         result = func(torch.stack(vecs,1).unsqueeze(0)) #input as 1 by d by n
         result = result.view(-1)                
         utils.vec2net(result,Delta)

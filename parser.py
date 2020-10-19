@@ -29,6 +29,8 @@ def parse_args():
     parser.add_argument("--experiment_name",    type=str)
     parser.add_argument("--path_to_aggNet",    type=str)
     parser.add_argument("--device",    type=str, choices=["cuda","cpu"], default='cuda')
+    parser.add_argument("--inner_epochs",    type=int, default=1)
+    
     args = parser.parse_args()
               
     n = args.num_clients

@@ -59,6 +59,7 @@ def adaptor(input):
     x=x.permute(1,0)
     w=foolsgold(x)
     print(w)
+    w=w/w.sum()
     out=torch.sum(x.permute(1,0)*w,dim=1,keepdim=True)
     return out
 
