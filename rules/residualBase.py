@@ -10,7 +10,7 @@ from functools import reduce
 import numpy as np
 import torch
 
-import utils
+from utils import utils
 
 '''
 Attack-Resistant Federated Learning with Residual-based Reweighting

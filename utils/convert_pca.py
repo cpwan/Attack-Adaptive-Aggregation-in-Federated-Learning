@@ -3,7 +3,7 @@ import copy
 import torch
 from sklearn.decomposition import TruncatedSVD as PCA
 
-from utils import getFloatSubModules
+from utils.utils import getFloatSubModules
 
 
 def getPCA(X, n_components):

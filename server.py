@@ -5,9 +5,9 @@ from copy import deepcopy
 import torch
 import torch.nn.functional as F
 
-import utils
-from backdoor_semantic_utils import SemanticBackdoor_Utils
-from backdoor_utils import Backdoor_Utils
+from utils import utils
+from utils.backdoor_semantic_utils import SemanticBackdoor_Utils
+from utils.backdoor_utils import Backdoor_Utils
 
 
 class Server():
@@ -156,7 +156,7 @@ class Server():
 
         saveAsPCA = True
         if saveAsPCA:
-            import convert_pca
+            from utils import convert_pca
             proj_vec = convert_pca._convertWithPCA(Delta)
             savepath = f'{self.savePath}/pca_{self.iter}.pt'
             torch.save(proj_vec, savepath)

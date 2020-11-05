@@ -198,7 +198,7 @@ if __name__ == "__main__":
           file=open(f"{log_path}{eps}_{scale}.txt", "w"))
 
     #     exit(0)
-    import allocateGPU
+    from utils import allocateGPU
 
     allocateGPU.allocate_gpu()
 

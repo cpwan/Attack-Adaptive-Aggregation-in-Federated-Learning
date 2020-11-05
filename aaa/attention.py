@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import convert_pca
-import utils
+from utils import convert_pca, utils
 
 
 class nonLinearity(nn.Module):

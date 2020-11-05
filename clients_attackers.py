@@ -3,9 +3,9 @@ from __future__ import print_function
 import torch
 import torch.nn.functional as F
 
-import utils
-from backdoor_semantic_utils import SemanticBackdoor_Utils
-from backdoor_utils import Backdoor_Utils
+from utils import utils
+from utils.backdoor_semantic_utils import SemanticBackdoor_Utils
+from utils.backdoor_utils import Backdoor_Utils
 from clients import *
 
 

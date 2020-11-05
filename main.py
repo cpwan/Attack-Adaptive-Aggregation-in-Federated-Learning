@@ -1,4 +1,4 @@
-from allocateGPU import *
+from utils.allocateGPU import *
 
 allocate_gpu()
 
