@@ -1,7 +1,7 @@
 --path_prefix
 ./AggData/dirichlet/
 --save_path
-./aggregator/attention_imdb_omniscient.pt
+./aaa/attention_imdb_omniscient.pt
 --log_path
 ./results/ablation_imdb_omniscient/
 --train_path

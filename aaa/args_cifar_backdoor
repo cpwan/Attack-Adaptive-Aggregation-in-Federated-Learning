@@ -1,7 +1,7 @@
 --path_prefix
 ./AggData/dirichlet/cifar/
 --save_path
-./aggregator/attention_cifar_backdoor.pt
+./aaa/attention_cifar_backdoor.pt
 --log_path
 ./results/ablation_cifar_backdoor/
 --train_path
