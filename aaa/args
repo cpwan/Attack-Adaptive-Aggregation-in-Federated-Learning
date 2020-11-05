@@ -1,7 +1,7 @@
 --path_prefix
 ./AggData/dirichlet/
 --save_path
-./aggregator/attention.pt
+./aaa/attention.pt
 --log_path
 ./results/ablation/
 --train_path

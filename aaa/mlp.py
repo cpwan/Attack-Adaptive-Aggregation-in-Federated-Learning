@@ -42,7 +42,7 @@ class MLP(nn.Module):
 
 class Net():
     def __init__(self):
-        self.path_to_net = "./aggregator/attention.pt"
+        self.path_to_net = "./aaa/attention.pt"
 
     
     def main(self,deltas:list,model):

@@ -213,7 +213,7 @@ class Server():
         out = self.FedFuncWholeStateDict(clients , Net().main)
         return out   
     def net_attention(self,clients):
-        from aggregator.attention import Net
+        from aaa.attention import Net
         
         net=Net()
         net.path_to_net=self.path_to_aggNet
@@ -221,7 +221,7 @@ class Server():
         out = self.FedFuncWholeStateDict(clients , lambda arr: net.main(arr,self.model)) 
         return out    
     def net_mlp(self,clients):
-        from aggregator.mlp import Net
+        from aaa.mlp import Net
         
         net=Net()
         net.path_to_net=self.path_to_aggNet

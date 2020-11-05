@@ -89,7 +89,7 @@ class AttentionLoop(nn.Module):
 class Net():
     def __init__(self, eps=0.001, scale=10):
         self.hidden_size = 21
-        self.path_to_net = "./aggregator/attention.pt"
+        self.path_to_net = "./aaa/attention.pt"
         self.eps=eps
         self.scale=scale
     

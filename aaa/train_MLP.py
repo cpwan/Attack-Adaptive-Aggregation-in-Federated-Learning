@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 import math
-from aggregator.mlp import MLP
+from aaa.mlp import MLP
 from torch.utils.data import Dataset, DataLoader,ConcatDataset
 
 
@@ -164,7 +164,7 @@ if __name__ == "__main__":
     # this also generates --help and error handling
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     parser.add_argument("--path_prefix",type=str, help="for example: ./AggData/dirichlet/cifar/")    
-    parser.add_argument("--save_path",type=str, help="for example: ./aggregator/attention.pt")
+    parser.add_argument("--save_path",type=str, help="for example: ./aaa/attention.pt")
     parser.add_argument("--log_path",type=str, help="for example: ./results/ablation/")
     parser.add_argument("--train_path",  
       nargs="+",  
