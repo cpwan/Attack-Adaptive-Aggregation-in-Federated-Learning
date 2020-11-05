@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument("--dataset", type=str, choices=["mnist", "cifar", "cifar100", "imdb"], default="mnist")
     parser.add_argument("--loader_type", type=str, choices=["iid", "byLabel", "dirichlet"], default="iid")
     parser.add_argument("--loader_path", type=str, default="./data/loader.pk", help="where to save the data partitions")
-    parser.add_argument("--GAR", type=str, )
+    parser.add_argument("--AR", type=str, )
     parser.add_argument("--n_attacker_backdoor", type=int, default=0)
     parser.add_argument("--n_attacker_semanticBackdoor", type=int, default=0)
     parser.add_argument("--n_attacker_labelFlipping", type=int, default=0)
@@ -53,7 +53,7 @@ def parse_args():
     args.attacker_list_omniscient = np.random.permutation(list(range(n)))[:m]
 
     if args.experiment_name == None:
-        args.experiment_name = f"{args.loader_type}/{args.attacks}/{args.GAR}"
+        args.experiment_name = f"{args.loader_type}/{args.attacks}/{args.AR}"
 
     return args
 

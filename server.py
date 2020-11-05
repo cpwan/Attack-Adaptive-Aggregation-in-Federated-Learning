@@ -20,7 +20,7 @@ class Server():
         self.init_stateChange()
         self.Delta = None
         self.iter = 0
-        self.GAR = self.FedAvg
+        self.AR = self.FedAvg
         self.func = torch.mean
         self.isSaveChanges = False
         self.savePath = './AggData'
@@ -132,7 +132,7 @@ class Server():
         if self.isSaveChanges:
             self.saveChanges(selectedClients)
 
-        Delta = self.GAR(selectedClients)
+        Delta = self.AR(selectedClients)
         for param in self.model.state_dict():
             self.model.state_dict()[param] += Delta[param]
         self.iter += 1
@@ -169,25 +169,25 @@ class Server():
 
     ## Aggregation functions ##
 
-    def set_GAR(self, gar):
-        if gar == 'fedavg':
-            self.GAR = self.FedAvg
-        elif gar == 'median':
-            self.GAR = self.FedMedian
-        elif gar == 'gm':
-            self.GAR = self.geometricMedian
-        elif gar == 'krum':
-            self.GAR = self.krum
-        elif gar == 'mkrum':
-            self.GAR = self.mkrum
-        elif gar == 'foolsgold':
-            self.GAR = self.foolsGold
-        elif gar == 'residualbase':
-            self.GAR = self.residualBase
-        elif gar == 'attention':
-            self.GAR = self.net_attention
-        elif gar == 'mlp':
-            self.GAR = self.net_mlp
+    def set_AR(self, ar):
+        if ar == 'fedavg':
+            self.AR = self.FedAvg
+        elif ar == 'median':
+            self.AR = self.FedMedian
+        elif ar == 'gm':
+            self.AR = self.geometricMedian
+        elif ar == 'krum':
+            self.AR = self.krum
+        elif ar == 'mkrum':
+            self.AR = self.mkrum
+        elif ar == 'foolsgold':
+            self.AR = self.foolsGold
+        elif ar == 'residualbase':
+            self.AR = self.residualBase
+        elif ar == 'attention':
+            self.AR = self.net_attention
+        elif ar == 'mlp':
+            self.AR = self.net_mlp
         else:
             raise ValueError("Not a valid aggregation rule or aggregation rule not implemented")
 

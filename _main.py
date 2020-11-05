@@ -14,7 +14,7 @@ def main(args):
     print('#####################')
     print('#####################')
     print('#####################')
-    print(f'Aggregation Rule:\t{args.GAR}\nData distribution:\t{args.loader_type}\nAttacks:\t{args.attacks} ')
+    print(f'Aggregation Rule:\t{args.AR}\nData distribution:\t{args.loader_type}\nAttacks:\t{args.attacks} ')
     print('#####################')
     print('#####################')
     print('#####################')
@@ -55,11 +55,11 @@ def main(args):
     # create server instance
     model0 = Net()
     server = Server(model0, testData, criterion, device)
-    server.set_GAR(args.GAR)
+    server.set_AR(args.AR)
     server.path_to_aggNet = args.path_to_aggNet
     if args.save_model_weights:
         server.isSaveChanges = True
-        server.savePath = f'./AggData/{args.loader_type}/{args.dataset}/{args.attacks}/{args.GAR}'
+        server.savePath = f'./AggData/{args.loader_type}/{args.dataset}/{args.attacks}/{args.AR}'
         from pathlib import Path
         Path(server.savePath).mkdir(parents=True, exist_ok=True)
         '''
