@@ -125,7 +125,7 @@ class Net():
         
         x = proj_vec.unsqueeze(0)
         beta = x.median(dim=-1,keepdims=True)[0]
-        beta = x.mean(dim=-1,keepdims=True)
+#         beta = x.mean(dim=-1,keepdims=True)
 
 #         weight = model.attention.affinity(beta,x)
 #         weight = torch.nn.Threshold(0.5 * 1.0 / weight.shape[-1],0)(weight)

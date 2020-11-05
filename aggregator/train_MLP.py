@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 import math
-from aggregator.attention import AttentionLoop
+from aggregator.mlp import MLP
 from torch.utils.data import Dataset, DataLoader,ConcatDataset
 
 
@@ -179,7 +179,6 @@ if __name__ == "__main__":
     parser.add_argument("--epochs",type=int, default=500)    
     parser.add_argument("--max_round",type=int, default=30)    
     parser.add_argument("--hidden_size",type=int, default=21)    
-    parser.add_argument("--batch_size",type=int, default=32)    
 
     args = parser.parse_args()
     
@@ -196,14 +195,14 @@ if __name__ == "__main__":
     epochs=args.epochs
     max_round=args.max_round
     hidden_size = args.hidden_size
-    batch_size=args.batch_size
+    
     print(f'train soft| train hard| valid soft|valid hard| median| mean \t\t train|valid|test', file=open(f"{log_path}{eps}_{scale}.txt","w"))
     
     
 #     exit(0)
     import allocateGPU
     allocateGPU.allocate_gpu()
-    
+ 
     learning_rate = 1e-4
 
 
@@ -213,88 +212,87 @@ if __name__ == "__main__":
     testDataset = ConcatDataset(testSet)
     print(*test_path,sep=',', file=open(f"{log_path}{eps}_{scale}_long.txt","w"))
 
-    dataloader = DataLoader(trainDataset, batch_size=batch_size, shuffle=True)
-    validloader = DataLoader(validDataset, batch_size=batch_size, shuffle=True)
-    testloader = DataLoader(testDataset, batch_size=batch_size, shuffle=True)
-    testloaderSeparate=[DataLoader(testItem, batch_size=max_round, shuffle=True) for testItem in testSet]
+    dataloader = DataLoader(trainDataset, batch_size=32, shuffle=True)
+    validloader = DataLoader(validDataset, batch_size=32, shuffle=True)
+    testloader = DataLoader(testDataset, batch_size=32, shuffle=True)
+    testloaderSeparate=[DataLoader(testItem, batch_size=30, shuffle=True) for testItem in testSet]
     
     k = trainDataset[0][0].shape[0]
 
-    model = AttentionLoop(k, hidden_size, nloop=5,eps=eps,scale=scale)
+    model = MLP(k*10, 10)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = torch.nn.L1Loss(reduction='mean')
 
     # for query=key:=identity, l1 score ~= 0.6
-    train_loss = []
-    train_loss_hard = []
-    valid_loss = []
-    valid_loss_hard = []
-    train_acc = []
-    valid_acc = []
-    test_acc = []
+train_loss = []
+train_loss_hard = []
+valid_loss = []
+valid_loss_hard = []
+train_acc = []
+valid_acc = []
+test_acc = []
 
-    for i in range(epochs):
-        lossCounter = loss_acc()
-        lossCounter2 = loss_acc()
-        lossCounter_median_ref = loss_acc()
-        lossCounter_mean_ref = loss_acc()
+for i in range(epochs):
+    lossCounter = loss_acc()
+    lossCounter2 = loss_acc()
+    lossCounter_median_ref = loss_acc()
+    lossCounter_mean_ref = loss_acc()
 
-        for x,y,c in dataloader:
-            optimizer.zero_grad()
-            x = x.cuda()
-            y = y.cuda()
-            c = c.cuda()
-            ## give a different prior to avoid over fitting
-            beta = x.median(dim=-1,keepdim=True)[0] # if (torch.rand(1)<0.5).item() else x.mean(dim=-1,keepdim=True)
+    for x,y,c in dataloader:
+        optimizer.zero_grad()
+        x = x.cuda()
+        y = y.cuda()
+        c = c.cuda()
+        beta = x.median(dim=-1,keepdim=True)[0]
 
-            # loss=loss_fn(model.cuda()(x),y[:,[0],:])
-            # loss=loss_fn(model.cuda()(x,x),z)
-            pred = model.cuda()(beta,x)
-            loss = loss_fn(pred,c[:,:,[0]])
+        # loss=loss_fn(model.cuda()(x),y[:,[0],:])
+        # loss=loss_fn(model.cuda()(x,x),z)
+        pred = model.cuda()(beta,x)
+        loss = loss_fn(pred,c[:,:,[0]])
 
-            pred_b = getBinaryPred(model,x,beta)
-            loss_b = loss_fn(pred_b,c[:,:,[0]])
+        pred_b = getBinaryPred(model,x,beta)
+        loss_b = loss_fn(pred_b,c[:,:,[0]])
 
-            lossCounter+=loss.cpu().detach().numpy()
-            lossCounter2+=loss_b.cpu().detach().numpy()
+        lossCounter+=loss.cpu().detach().numpy()
+        lossCounter2+=loss_b.cpu().detach().numpy()
 
-            loss_median_ref = loss_fn(beta,c[:,:,[0]])
-            loss_mean_ref = loss_fn(x.mean(dim=-1,keepdim=True),c[:,:,[0]])
+        loss_median_ref = loss_fn(beta,c[:,:,[0]])
+        loss_mean_ref = loss_fn(x.mean(dim=-1,keepdim=True),c[:,:,[0]])
 
-            lossCounter_median_ref+=loss_median_ref.cpu().detach().numpy()
-            lossCounter_mean_ref+=loss_mean_ref.cpu().detach().numpy()
-            # print(f'{loss:.4f},{loss_b:.6f}')
+        lossCounter_median_ref+=loss_median_ref.cpu().detach().numpy()
+        lossCounter_mean_ref+=loss_mean_ref.cpu().detach().numpy()
+        # print(f'{loss:.4f},{loss_b:.6f}')
 
-            loss.backward()
-            optimizer.step()
-          # print(f'train: {lossCounter},{lossCounter2}')
-
-
-        lossCounter_test, lossCounter2_test = test(model,testloader)
-
-        train_score = test_classes_hamming(model.cpu(),dataloader)
-        valid_score = test_classes_hamming(model.cpu(),validloader)
-        test_score = test_classes_hamming(model.cpu(),testloader)
-
-        print(f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
-        accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}')
-        print(f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
-        accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}', file=open(f"{log_path}{eps}_{scale}.txt","a"))
-        print()
-        train_loss.append(lossCounter.value())
-        train_loss_hard.append(lossCounter2.value())
-        valid_loss.append(lossCounter_test.value())
-        valid_loss_hard.append(lossCounter2_test.value())
-
-        train_acc.append(train_score)
-        valid_acc.append(valid_score)
-        test_acc.append(test_score)
-
-        test_acc_sep=[test_classes_hamming(model.cpu(),testloader_sep).item() for testloader_sep in testloaderSeparate]
-        print(*test_acc_sep,sep=',', file=open(f"{log_path}{eps}_{scale}_long.txt","a"))
-
-        if ((i+1)%100==0):
-            torch.save(model.state_dict(),f"{save_path[:-3]}_{i}.pt")
+        loss.backward()
+        optimizer.step()
+      # print(f'train: {lossCounter},{lossCounter2}')
 
 
-    torch.save(model.state_dict(),save_path)
+    lossCounter_test, lossCounter2_test = test(model,testloader)
+
+    train_score = test_classes_hamming(model.cpu(),dataloader)
+    valid_score = test_classes_hamming(model.cpu(),validloader)
+    test_score = test_classes_hamming(model.cpu(),testloader)
+
+    print(f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
+    accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}')
+    print(f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
+    accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}', file=open(f"{log_path}{eps}_{scale}.txt","a"))
+    print()
+    train_loss.append(lossCounter.value())
+    train_loss_hard.append(lossCounter2.value())
+    valid_loss.append(lossCounter_test.value())
+    valid_loss_hard.append(lossCounter2_test.value())
+
+    train_acc.append(train_score)
+    valid_acc.append(valid_score)
+    test_acc.append(test_score)
+    
+    test_acc_sep=[test_classes_hamming(model.cpu(),testloader_sep).item() for testloader_sep in testloaderSeparate]
+    print(*test_acc_sep,sep=',', file=open(f"{log_path}{eps}_{scale}_long.txt","a"))
+    
+    if ((i+1)%100==0):
+        torch.save(model.state_dict(),f"{save_path[:-3]}_{i}.pt")
+    
+    
+torch.save(model.state_dict(),save_path)
