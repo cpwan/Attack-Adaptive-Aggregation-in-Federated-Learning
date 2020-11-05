@@ -1,9 +1,6 @@
 from __future__ import print_function
-import argparse
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 import torchtext
 import torchtext.experimental
 import torchtext.experimental.vectors

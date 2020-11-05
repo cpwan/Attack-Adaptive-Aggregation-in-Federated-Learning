@@ -1,32 +1,28 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Python version: 3.6
-import utils
 import copy
-import torch
-import numpy as np
 import math
 import random
-from scipy import stats
-from functools import reduce
 import time
-import sklearn.metrics.pairwise as smp
+from functools import reduce
+
+import numpy as np
+import torch
+
+import utils
+
 '''
 Attack-Resistant Federated Learning with Residual-based Reweighting
 
 retrieved from https://github.com/fushuhao6/Attack-Resistant-Federated-Learning/blob/master/FedAvg/averaging.py
 
 Reference:
-@article{fu2019attackresistant,
-    title={Attack-Resistant Federated Learning with Residual-based Reweighting},
-    author={Shuhao Fu and Chulin Xie and Bo Li and Qifeng Chen},
-    journal={arXiv:1912.11464},
-    year={2019}
-}
+Fu, Shuhao, et al. "Attack-Resistant Federated Learning with Residual-based Reweighting." arXiv preprint arXiv:1912.11464 (2019).
+
 '''
 
 eps = np.finfo(float).eps
-
 
 
 def average_weights(w):
@@ -310,7 +306,7 @@ def IRLS_other_split_restricted(w_locals, LAMBDA=2, thresh=0.1, mode='median'):
     elif mode == 'theilsen':
         reweight_algorithm = theilsen_reweight_algorithm_restricted
     elif mode == 'gaussian':
-        reweight_algorithm = gaussian_reweight_algorithm_restricted     # in gaussian reweight algorithm, lambda is sigma
+        reweight_algorithm = gaussian_reweight_algorithm_restricted  # in gaussian reweight algorithm, lambda is sigma
 
     SHARD_SIZE = 2000
     cur_time = time.time()
@@ -540,19 +536,17 @@ def Repeated_Median(w):
     print('repeated median aggregation took {}s'.format(time.time() - cur_time))
     return w_med
 
+
 def gaussian_zero_mean(x, sig=1):
     return torch.exp(- x * x / (2 * sig * sig))
 
 
-
-
-
 class Net():
     def __init__(self, LAMBDA=2, thresh=0.1):
-        self.LAMBDA=LAMBDA
-        self.thresh=thresh
-    
-    def main(self,deltas:list):
+        self.LAMBDA = LAMBDA
+        self.thresh = thresh
+
+    def main(self, deltas: list):
         '''
         deltas: a list of state_dicts
 
@@ -560,16 +554,16 @@ class Net():
             Delta: robustly aggregated state_dict
 
         '''
-        Delta=deltas[0]
-        param_trainable=utils.getFloatSubModules(deltas[0])
+        Delta = deltas[0]
+        param_trainable = utils.getFloatSubModules(deltas[0])
 
-        param_nontrainable=[param for param in deltas[0].keys() if param not in param_trainable]
+        param_nontrainable = [param for param in deltas[0].keys() if param not in param_trainable]
         for param in param_nontrainable:
             for i in range(len(deltas)):
                 del deltas[i][param]
-#         print(utils.getFloatSubModules(deltas[0]))
-        
-        rDelta, w=IRLS_aggregation_split_restricted(deltas, self.LAMBDA, self.thresh)
+        #         print(utils.getFloatSubModules(deltas[0]))
+
+        rDelta, w = IRLS_aggregation_split_restricted(deltas, self.LAMBDA, self.thresh)
         Delta.update(rDelta)
         print(w)
         return Delta

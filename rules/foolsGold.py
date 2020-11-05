@@ -1,20 +1,19 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
 '''
 FoolsGold
 
 retrieved from https://github.com/DistributedML/FoolsGold/blob/master/deep-fg/fg/foolsgold.py
 
 Reference:
-"The Limitations of Federated Learning in Sybil Settings." 
-Clement Fung, Chris J.M. Yoon, Ivan Beschastnikh.
-To appear in 23rd International Symposium on Research in Attacks, Intrusions and Defenses (RAID) 2020.
+Fung, Clement, Chris JM Yoon, and Ivan Beschastnikh. "The Limitations of Federated Learning in Sybil Settings." 23rd International Symposium on Research in Attacks, Intrusions and Defenses ({RAID} 2020). 2020.
+
 '''
 
 import numpy as np
-import pdb
 import sklearn.metrics.pairwise as smp
+
 
 # Takes in grad
 # Compute similarity
@@ -37,7 +36,7 @@ def foolsgold(grads):
     # Rescale so that max value is wv
     wv = wv / np.max(wv)
     wv[(wv == 1)] = .99
-    
+
     # Logit function
     wv = (np.log(wv / (1 - wv)) + 0.5)
     wv[(np.isinf(wv) + wv > 1)] = 1
@@ -55,20 +54,21 @@ def adaptor(input):
     return 
         foolsGold :  vector dimension 
     '''
-    x=input.squeeze(0)
-    x=x.permute(1,0)
-    w=foolsgold(x)
+    x = input.squeeze(0)
+    x = x.permute(1, 0)
+    w = foolsgold(x)
     print(w)
-    w=w/w.sum()
-    out=torch.sum(x.permute(1,0)*w,dim=1,keepdim=True)
+    w = w / w.sum()
+    out = torch.sum(x.permute(1, 0) * w, dim=1, keepdim=True)
     return out
+
 
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
     def forward(self, input):
-#         print(input.shape)
+        #         print(input.shape)
         '''
         input: batchsize* vector dimension * n 
         (1 by d by n)
@@ -77,8 +77,5 @@ class Net(nn.Module):
             out : size =vector dimension, will be flattened afterwards
         '''
         out = adaptor(input)
-        
-        
-        return out
-     
 
+        return out

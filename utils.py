@@ -111,7 +111,7 @@ def stackStateDicts(deltas):
 
 
 if __name__ == "__main__":
-    from cifar import Net
+    from tasks.cifar import Net
 
     netA = Net().state_dict()
     netB = Net().state_dict()
