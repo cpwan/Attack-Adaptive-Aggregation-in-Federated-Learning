@@ -65,7 +65,7 @@ def main(args):
         '''
         honest clients are labeled as 1, malicious clients are labeled as 0
         '''
-        label = torch.ones(10)
+        label = torch.ones(args.num_clients)
         for i in args.attacker_list_labelFlipping:
             label[i] = 0
         for i in args.attacker_list_labelFlippingDirectional:

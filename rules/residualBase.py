@@ -24,6 +24,8 @@ Fu, Shuhao, et al. "Attack-Resistant Federated Learning with Residual-based Rewe
 
 eps = np.finfo(float).eps
 
+useGPU=True
+
 
 def average_weights(w):
     cur_time = time.time()
@@ -59,6 +61,8 @@ def weighted_average(w_list, weights):
 
 
 def reweight_algorithm_restricted(y, LAMBDA, thresh):
+    if useGPU:
+        y=y.cuda()
     num_models = y.shape[1]
     total_num = y.shape[0]
     slopes, intercepts = repeated_median(y)
@@ -87,8 +91,12 @@ def reweight_algorithm_restricted(y, LAMBDA, thresh):
     reshaped_std = torch.t(reweight_std.repeat(num_models, 1))
     reweight_regulized = reweight * reshaped_std  # reweight confidence by its standard deviation
 
-    restricted_y = y * (reweight >= thresh).type(torch.FloatTensor) + line_y * (reweight < thresh).type(
-        torch.FloatTensor)
+    if useGPU:
+        restricted_y = y * (reweight >= thresh).type(torch.cuda.FloatTensor) + line_y * (reweight < thresh).type(
+            torch.cuda.FloatTensor)
+    else:
+        restricted_y = y * (reweight >= thresh).type(torch.FloatTensor) + line_y * (reweight < thresh).type(
+            torch.FloatTensor)
     return reweight_regulized, restricted_y
 
 
@@ -112,9 +120,12 @@ def gaussian_reweight_algorithm_restricted(y, sig, thresh):
     reweight_std = reweight.std(dim=1)  # its standard deviation
     reshaped_std = torch.t(reweight_std.repeat(num_models, 1))
     reweight_regulized = reweight * reshaped_std  # reweight confidence by its standard deviation
-
-    restricted_y = y * (reweight >= thresh).type(torch.FloatTensor) + line_y * (reweight < thresh).type(
-        torch.FloatTensor)
+    if useGPU:
+        restricted_y = y * (reweight >= thresh).type(torch.cuda.FloatTensor) + line_y * (reweight < thresh).type(
+            torch.cuda.FloatTensor)
+    else:
+        restricted_y = y * (reweight >= thresh).type(torch.FloatTensor) + line_y * (reweight < thresh).type(
+            torch.FloatTensor)
     return reweight_regulized, restricted_y
 
 
@@ -146,9 +157,12 @@ def theilsen_reweight_algorithm_restricted(y, LAMBDA, thresh):
     reweight_std = reweight.std(dim=1)  # its standard deviation
     reshaped_std = torch.t(reweight_std.repeat(num_models, 1))
     reweight_regulized = reweight * reshaped_std  # reweight confidence by its standard deviation
-
-    restricted_y = y * (reweight >= thresh).type(torch.FloatTensor) + line_y * (reweight < thresh).type(
-        torch.FloatTensor)
+    if useGPU:
+        restricted_y = y * (reweight >= thresh).type(torch.cuda.FloatTensor) + line_y * (reweight < thresh).type(
+            torch.cuda.FloatTensor)
+    else:
+        restricted_y = y * (reweight >= thresh).type(torch.FloatTensor) + line_y * (reweight < thresh).type(
+            torch.FloatTensor)
     return reweight_regulized, restricted_y
 
 
@@ -177,9 +191,12 @@ def median_reweight_algorithm_restricted(y, LAMBDA, thresh):
     reweight_std = reweight.std(dim=1)  # its standard deviation
     reshaped_std = torch.t(reweight_std.repeat(num_models, 1))
     reweight_regulized = reweight * reshaped_std  # reweight confidence by its standard deviation
-
-    restricted_y = y * (reweight >= thresh).type(torch.FloatTensor) + y_median * (reweight < thresh).type(
-        torch.FloatTensor)
+    if useGPU:
+        restricted_y = y * (reweight >= thresh).type(torch.cuda.FloatTensor) + y_median * (reweight < thresh).type(
+            torch.cuda.FloatTensor)
+    else:
+        restricted_y = y * (reweight >= thresh).type(torch.FloatTensor) + y_median * (reweight < thresh).type(
+            torch.FloatTensor)
     return reweight_regulized, restricted_y
 
 
@@ -215,8 +232,14 @@ def simple_reweight(y, LAMBDA, thresh, alpha):
     # remove_ids = sort_ids >= int((1 - alpha) * num_models)
     remove_ids = [i for i in sort_ids if i.item() >= int((1 - alpha) * num_models)]
     remove_ids = remove_ids * (reweight < thresh)
-    keep_ids = (1 - remove_ids).type(torch.FloatTensor)
-    remove_ids = remove_ids.type(torch.FloatTensor)
+    
+    if useGPU:
+        keep_ids = (1 - remove_ids).type(torch.cuda.FloatTensor)
+        remove_ids = remove_ids.type(torch.cuda.FloatTensor)
+    else:
+        keep_ids = (1 - remove_ids).type(torch.FloatTensor)
+        remove_ids = remove_ids.type(torch.FloatTensor)
+    
     restricted_y = y * keep_ids + line_y * remove_ids
     reweight_regulized = reweight_regulized * keep_ids
     return reweight_regulized, restricted_y
@@ -254,7 +277,9 @@ def IRLS_aggregation_split_restricted(w_locals, LAMBDA=2, thresh=0.1):
     # w_selected = [w[i] for i in random_select(len(w))]
     device = w[0][list(w[0].keys())[0]].device
     reweight_sum = torch.zeros(len(w)).to(device)
-
+    if useGPU:
+        reweight_sum=reweight_sum.cuda()
+        
     for k in w_med.keys():
         shape = w_med[k].shape
         if len(shape) == 0:
@@ -286,7 +311,7 @@ def IRLS_aggregation_split_restricted(w_locals, LAMBDA=2, thresh=0.1):
         # print(reweight_sum)
     reweight_sum = reweight_sum / reweight_sum.max()
     reweight_sum = reweight_sum * reweight_sum
-    w_med, reweight = weighted_average(w, reweight_sum)
+    w_med, reweight = weighted_average(w, reweight_sum.cpu())
 
     reweight = (reweight / reweight.max()).to(torch.device("cpu"))
     weights = torch.zeros(len(w_locals))
@@ -461,11 +486,18 @@ def theilsen(y):
     yy = y.repeat(1, 1, num_models).reshape(total_num, num_models, num_models)
     yyj = yy
     yyi = yyj.transpose(-1, -2)
-    xx = torch.FloatTensor(range(num_models))
+    
+    if useGPU:
+        xx = torch.cuda.FloatTensor(range(num_models))
+    else:
+        xx = torch.FloatTensor(range(num_models))
     xxj = xx.repeat(total_num, num_models, 1)
     xxi = xxj.transpose(-1, -2) + eps
 
-    diag = torch.FloatTensor([float('Inf')] * num_models)
+    if useGPU:
+        diag = torch.cuda.FloatTensor([float('Inf')] * num_models)
+    else:
+        diag = torch.FloatTensor([float('Inf')] * num_models)
     inf_lower = torch.tril(diag.repeat(num_models, 1), diagonal=0).repeat(total_num, 1, 1)
     diag = torch.diag(diag).repeat(total_num, 1, 1)
 
@@ -478,7 +510,10 @@ def theilsen(y):
     # get intercepts (intercept of median)
     yy_median = median_opt(y)
     xx_median = [(num_models - 1) / 2.0] * total_num
-    xx_median = torch.FloatTensor(xx_median)
+    if useGPU:
+        xx_median = torch.cuda.FloatTensor(xx_median)
+    else:
+        xx_median = torch.FloatTensor(xx_median)
     intercepts = yy_median - slopes * xx_median
     return slopes, intercepts
 
@@ -562,7 +597,7 @@ class Net():
             for i in range(len(deltas)):
                 del deltas[i][param]
         #         print(utils.getFloatSubModules(deltas[0]))
-
+        
         rDelta, w = IRLS_aggregation_split_restricted(deltas, self.LAMBDA, self.thresh)
         Delta.update(rDelta)
         print(w)
