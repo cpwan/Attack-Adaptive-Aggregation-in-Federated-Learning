@@ -7,7 +7,7 @@ from utils.utils import getFloatSubModules
 
 
 def getPCA(X, n_components):
-    out = getPCA_torch(X, n_components)
+    out = getPCA_torch_over(X, n_components)
     return out
 
 
@@ -20,13 +20,25 @@ def getPCA_sklearn(X, n_components):
     return out
 
 
-def getPCA_torch(X, n_components):
+def getPCA_torch_under(X, n_components):
+    '''
+    X is m by n. m is the number of features, n is the number of samples.
+    When m<n, X is underdetermined. Find the PCA with the usual way.
+    '''
+    n_components = min(n_components, X.shape[0])
+    U, S, V = torch.svd(X.permute(1, 0))
+    out = U*S
+    return out[:, :n_components].permute(1, 0)
+
+def getPCA_torch_over(X, n_components):
+    '''
+    X is m by n. m is the number of features, n is the number of samples.
+    When n<m, X is overdetermined. Find the PCA by SVD on X^T to reduce memory and time cost.
+    '''
     n_components = min(n_components, X.shape[0])
     U, S, V = torch.svd(X)
-    X_ = V * S
-    out = X_[:, :n_components].permute(1, 0)
-    return out
-
+    out = V*S
+    return out[:, :n_components].permute(1, 0)
 
 def applyToEachSubmodule(Delta, f) -> (dict):
     '''
@@ -60,7 +72,7 @@ def net2vec(net) -> (torch.Tensor):
 
 
 def _convertWithPCA(data):
-    proj = applyToEachSubmodule(data, lambda x: getPCA(x.cpu(), 6))
+    proj = applyToEachSubmodule(data, lambda x: getPCA(x.cpu(), 10))
     proj_vec = net2vec(proj)
     return proj_vec
 

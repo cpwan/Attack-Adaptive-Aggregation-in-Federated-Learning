@@ -195,8 +195,11 @@ if __name__ == "__main__":
     max_round = args.max_round
     hidden_size = args.hidden_size
     batch_size = args.batch_size
+    
+    import os
+    os.makedirs(os.path.dirname(f"{log_path}{eps}_{scale}_{hidden_size}.txt"), exist_ok=True)
     print(f'train soft| train hard| valid soft|valid hard| median| mean \t\t train|valid|test',
-          file=open(f"{log_path}{eps}_{scale}.txt", "w"))
+          file=open(f"{log_path}{eps}_{scale}_{hidden_size}.txt", "w"))
 
     #     exit(0)
     from utils import allocateGPU
@@ -207,18 +210,29 @@ if __name__ == "__main__":
 
     trainDataset = ConcatDataset(
         [FLdata(path_prefix + path_to_folder, list(range(0, max_round))) for path_to_folder in train_path])
+#     validDataset = ConcatDataset(
+#         [FLdata(path_prefix + path_to_folder, list(range(max_round // 3 * 2, max_round))) for path_to_folder in
+#          train_path])
     validDataset = ConcatDataset(
-        [FLdata(path_prefix + path_to_folder, list(range(max_round // 3 * 2, max_round))) for path_to_folder in
-         train_path])
+        [FLdata(path_prefix + path_to_folder, list(range(0, max_round // 3 ))) for path_to_folder in
+         test_path])
     testSet = [FLdata(path_prefix + path_to_folder, list(range(0, max_round))) for path_to_folder in test_path]
     testDataset = ConcatDataset(testSet)
-    print(*test_path, sep=',', file=open(f"{log_path}{eps}_{scale}_long.txt", "w"))
+    print(*test_path, sep=',', file=open(f"{log_path}{eps}_{scale}_{hidden_size}_long.txt", "w"))
 
+    
     dataloader = DataLoader(trainDataset, batch_size=batch_size, shuffle=True)
+    print('Loaded train dataset',
+          file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
     validloader = DataLoader(validDataset, batch_size=batch_size, shuffle=True)
+    print('Loaded validation dataset',
+          file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
     testloader = DataLoader(testDataset, batch_size=batch_size, shuffle=True)
+    print('Loaded test dataset',
+          file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
     testloaderSeparate = [DataLoader(testItem, batch_size=max_round, shuffle=True) for testItem in testSet]
-
+    print('Loaded test dataset separately',
+              file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
     k = trainDataset[0][0].shape[0]
 
     model = AttentionLoop(k, hidden_size, nloop=5, eps=eps, scale=scale)
@@ -233,7 +247,7 @@ if __name__ == "__main__":
     train_acc = []
     valid_acc = []
     test_acc = []
-
+    best_testScore=1000000
     for i in range(epochs):
         lossCounter = loss_acc()
         lossCounter2 = loss_acc()
@@ -269,20 +283,22 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
         # print(f'train: {lossCounter},{lossCounter2}')
-
+        print(f'Model trained for {i}-th epoch',
+                  file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
         lossCounter_test, lossCounter2_test = test(model, testloader)
 
         train_score = test_classes_hamming(model.cpu(), dataloader)
         valid_score = test_classes_hamming(model.cpu(), validloader)
         test_score = test_classes_hamming(model.cpu(), testloader)
-
+        print(f'Model tested for {i}-th epoch',
+                  file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
         print(
             f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
         accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}')
         print(
             f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
         accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}',
-            file=open(f"{log_path}{eps}_{scale}.txt", "a"))
+            file=open(f"{log_path}{eps}_{scale}_{hidden_size}.txt", "a"))
         print()
         train_loss.append(lossCounter.value())
         train_loss_hard.append(lossCounter2.value())
@@ -295,9 +311,12 @@ if __name__ == "__main__":
 
         test_acc_sep = [test_classes_hamming(model.cpu(), testloader_sep).item() for testloader_sep in
                         testloaderSeparate]
-        print(*test_acc_sep, sep=',', file=open(f"{log_path}{eps}_{scale}_long.txt", "a"))
+        print(*test_acc_sep, sep=',', file=open(f"{log_path}{eps}_{scale}_{hidden_size}_long.txt", "a"))
 
         if ((i + 1) % 100 == 0):
-            torch.save(model.state_dict(), f"{save_path[:-3]}_{i}.pt")
+            torch.save(model.state_dict(), f"{save_path[:-3]}_{eps}_{scale}_{hidden_size}_{i}.pt")
+        if best_testScore>test_score:
+            best_testScore=test_score
+            torch.save(model.state_dict(), f"{save_path[:-3]}_{eps}_{scale}_{hidden_size}.pt")
 
-    torch.save(model.state_dict(), save_path)
+    torch.save(model.state_dict(), f"{save_path[:-3]}_{eps}_{scale}_{hidden_size}.pt")

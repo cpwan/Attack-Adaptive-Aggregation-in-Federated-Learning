@@ -21,6 +21,7 @@ def parse_args():
     parser.add_argument("--loader_path", type=str, default="./data/loader.pk", help="where to save the data partitions")
     parser.add_argument("--AR", type=str, )
     parser.add_argument("--n_attacker_backdoor", type=int, default=0)
+    parser.add_argument("--backdoor_trigger", nargs="*",  type=int, default=[0,0,1,1], help="the hyperparameter for backdoor trigger, do `--backdoor_trigger x_offset y_offset x_interval y_interval`")    
     parser.add_argument("--n_attacker_semanticBackdoor", type=int, default=0)
     parser.add_argument("--n_attacker_labelFlipping", type=int, default=0)
     parser.add_argument("--n_attacker_labelFlippingDirectional", type=int, default=0)

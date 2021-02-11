@@ -5,27 +5,41 @@ import pickle
 import torch
 import torch.nn as nn
 from torchvision import datasets, transforms
+from torchvision.models.resnet import resnet18
 
 from dataloader import *
 
 
+# def Net():
+#     num_classes = 100
+#     model = torch.hub.load('pytorch/vision:v0.6.0', 'mobilenet_v2', pretrained=True)
+#     n = model.classifier[-1].in_features
+#     model.classifier[-1] = nn.Linear(n, num_classes)
+#     return model
+
+# def getDataset():
+#     dataset = datasets.CIFAR100('./data',
+#                                 train=True,
+#                                 download=True,
+#                                 transform=transforms.Compose([transforms.ToTensor(),
+#                                                               transforms.Normalize((0.485, 0.456, 0.406),
+#                                                                                    (0.229, 0.224, 0.225))]))
+#     return dataset
+
 def Net():
     num_classes = 100
-    model = torch.hub.load('pytorch/vision:v0.6.0', 'mobilenet_v2', pretrained=True)
-    n = model.classifier[-1].in_features
-    model.classifier[-1] = nn.Linear(n, num_classes)
+    model = resnet18(pretrained=True)
+    n = model.fc.in_features
+    model.fc = nn.Linear(n, num_classes)
     return model
-
 
 def getDataset():
     dataset = datasets.CIFAR100('./data',
-                                train=True,
-                                download=True,
-                                transform=transforms.Compose([transforms.ToTensor(),
-                                                              transforms.Normalize((0.485, 0.456, 0.406),
-                                                                                   (0.229, 0.224, 0.225))]))
+                               train=True,
+                               download=True,
+                               transform=transforms.Compose([transforms.ToTensor(),
+                                                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]))
     return dataset
-
 
 def basic_loader(num_clients, loader_type):
     dataset = getDataset()
@@ -59,15 +73,20 @@ def train_dataloader(num_clients, loader_type='iid', store=True, path='./data/lo
     return loader
 
 
+# def test_dataloader(test_batch_size):
+#     test_loader = torch.utils.data.DataLoader(
+#         datasets.CIFAR100('./data', train=False, transform=transforms.Compose([transforms.ToTensor(),
+#                                                                                transforms.Normalize(
+#                                                                                    (0.485, 0.456, 0.406),
+#                                                                                    (0.229, 0.224, 0.225))])),
+#         batch_size=test_batch_size, shuffle=True)
+#     return test_loader
+
 def test_dataloader(test_batch_size):
     test_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR100('./data', train=False, transform=transforms.Compose([transforms.ToTensor(),
-                                                                               transforms.Normalize(
-                                                                                   (0.485, 0.456, 0.406),
-                                                                                   (0.229, 0.224, 0.225))])),
+        datasets.CIFAR100('./data', train=False,                                transform=transforms.Compose([transforms.ToTensor(),                                                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])),
         batch_size=test_batch_size, shuffle=True)
     return test_loader
-
 
 if __name__ == '__main__':
     print("#Initialize a network")
@@ -75,9 +94,9 @@ if __name__ == '__main__':
     summary(net.cuda(), (3, 32, 32))
 
     print("\n#Initialize dataloaders")
-    loader_types = ['iid', 'byLabel', 'dirichlet']
+    loader_types = ['dirichlet']
     for i in range(len(loader_types)):
-        loader = train_dataloader(20, loader_types[i], store=False)
+        loader = train_dataloader(10, loader_types[i], store=False)
         print(f"Initialized {len(loader)} loaders (type: {loader_types[i]}), each with batch size {loader.bsz}.\
         \nThe size of dataset in each loader are:")
         print([len(loader[i].dataset) for i in range(len(loader))])

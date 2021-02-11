@@ -111,7 +111,7 @@ class dirichletLoader(customDataLoader):
             p = np.random.dirichlet([self.alpha] * self.size)
             # choose which partition a data is assigned to
             assignment = np.random.choice(range(self.size), size=len(label_iloc), p=p.tolist())
-            part_list = [(label_iloc[(assignment == i)]).tolist() for i in range(self.size)]
+            part_list = [(label_iloc[(assignment == k)]).tolist() for k in range(self.size)]
             for j in range(self.size):
                 partition_list[j] += part_list[j]
         return partition_list

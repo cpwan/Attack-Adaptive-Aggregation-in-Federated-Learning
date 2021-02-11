@@ -7,7 +7,7 @@ from tensorboardX import SummaryWriter
 
 from clients_attackers import *
 from server import Server
-from tasks import cifar, cifar100, imdb, mnist
+
 
 
 def main(args):
@@ -28,24 +28,28 @@ def main(args):
     writer = SummaryWriter(f'./logs/{args.output_folder}/{args.experiment_name}')
 
     if args.dataset == 'mnist':
+        from tasks import mnist
         trainData = mnist.train_dataloader(args.num_clients, loader_type=args.loader_type, path=args.loader_path,
                                            store=False)
         testData = mnist.test_dataloader(args.test_batch_size)
         Net = mnist.Net
         criterion = F.cross_entropy
     elif args.dataset == 'cifar':
+        from tasks import cifar
         trainData = cifar.train_dataloader(args.num_clients, loader_type=args.loader_type, path=args.loader_path,
                                            store=False)
         testData = cifar.test_dataloader(args.test_batch_size)
         Net = cifar.Net
         criterion = F.cross_entropy
     elif args.dataset == 'cifar100':
+        from tasks import cifar100
         trainData = cifar100.train_dataloader(args.num_clients, loader_type=args.loader_type, path=args.loader_path,
                                               store=False)
         testData = cifar100.test_dataloader(args.test_batch_size)
         Net = cifar100.Net
         criterion = F.cross_entropy
     elif args.dataset == 'imdb':
+        from tasks import imdb
         trainData = imdb.train_dataloader(args.num_clients, loader_type=args.loader_type, path=args.loader_path,
                                           store=False)
         testData = imdb.test_dataloader(args.test_batch_size)
@@ -102,6 +106,16 @@ def main(args):
                                            args.inner_epochs)
         elif i in attacker_list_backdoor:
             client_i = Attacker_Backdoor(i, model, trainData[i], optimizer, criterion, device, args.inner_epochs)
+            
+            if 'RANDOM' in args.attacks.upper():
+                client_i.utils.setRandomTrigger(seed=args.attacks)
+                print(client_i.utils.trigger_position)
+                print(f'Client {i} is using a random backdoor with seed \"{args.attacks}\"')
+            if 'CUSTOM' in args.attacks.upper():
+                client_i.utils.setTrigger(*args.backdoor_trigger)
+                print(client_i.utils.trigger_position)
+                print(f'Client {i} is using a backdoor with hyperparameter \"{args.backdoor_trigger}\"')
+            
         elif i in attacker_list_semanticBackdoor:
             client_i = Attacker_SemanticBackdoor(i, model, trainData[i], optimizer, criterion, device,
                                                  args.inner_epochs)

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from utils import utils
 from utils.backdoor_semantic_utils import SemanticBackdoor_Utils
 from utils.backdoor_utils import Backdoor_Utils
-
+import time
 
 class Server():
     def __init__(self, model, dataLoader, criterion=F.nll_loss, device='cpu'):
@@ -62,11 +62,11 @@ class Server():
         accuracy = 100. * correct / count
         self.model.cpu()  ## avoid occupying gpu when idle
         print(
-            '\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(test_loss, correct, count, accuracy))
+            '[Server] Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(test_loss, correct, count, accuracy))
         return test_loss, accuracy
 
     def test_backdoor(self):
-        print("[Server] Start testing backdoor")
+        print("[Server] Start testing backdoor\n")
         self.model.to(self.device)
         self.model.eval()
         test_loss = 0
@@ -87,7 +87,7 @@ class Server():
 
         self.model.cpu()  ## avoid occupying gpu when idle
         print(
-            '\nTest set (Backdoored): Average loss: {:.4f}, Success rate: {}/{} ({:.0f}%)\n'.format(test_loss, correct,
+            '[Server] Test set (Backdoored): Average loss: {:.4f}, Success rate: {}/{} ({:.0f}%)\n'.format(test_loss, correct,
                                                                                                     len(
                                                                                                         self.dataLoader.dataset),
                                                                                                     accuracy))
@@ -116,7 +116,7 @@ class Server():
 
         self.model.cpu()  ## avoid occupying gpu when idle
         print(
-            '\nTest set (Semantic Backdoored): Average loss: {:.4f}, Success rate: {}/{} ({:.0f}%)\n'.format(test_loss,
+            '[Server] Test set (Semantic Backdoored): Average loss: {:.4f}, Success rate: {}/{} ({:.0f}%)\n'.format(test_loss,
                                                                                                              correct,
                                                                                                              len(
                                                                                                                  self.dataLoader.dataset),
@@ -131,8 +131,12 @@ class Server():
 
         if self.isSaveChanges:
             self.saveChanges(selectedClients)
-
+            
+        tic = time.perf_counter()
         Delta = self.AR(selectedClients)
+        toc = time.perf_counter()
+        print(f"[Server] The aggregation takes {toc - tic:0.6f} seconds.\n")
+        
         for param in self.model.state_dict():
             self.model.state_dict()[param] += Delta[param]
         self.iter += 1
@@ -147,7 +151,7 @@ class Server():
         param_nontrainable = [param for param in Delta.keys() if param not in param_trainable]
         for param in param_nontrainable:
             del Delta[param]
-        print(f"Saving the model weight of the trainable paramters:\n {Delta.keys()}")
+        print(f"[Server] Saving the model weight of the trainable paramters:\n {Delta.keys()}")
         for param in param_trainable:
             ##stacking the weight in the innerest dimension
             param_stack = torch.stack([delta[param] for delta in deltas], -1)
@@ -155,17 +159,19 @@ class Server():
             Delta[param] = shaped
 
         saveAsPCA = True
+        saveOriginal = False
         if saveAsPCA:
             from utils import convert_pca
             proj_vec = convert_pca._convertWithPCA(Delta)
             savepath = f'{self.savePath}/pca_{self.iter}.pt'
             torch.save(proj_vec, savepath)
-            print(f'The PCA projections of Weight delta has been saved to {savepath} (with shape {proj_vec.shape})')
-            return
-        savepath = f'{self.savePath}/{self.iter}.pt'
+            print(f'[Server] The PCA projections of the update vectors have been saved to {savepath} (with shape {proj_vec.shape})')
+#             return
+        if saveOriginal:
+            savepath = f'{self.savePath}/{self.iter}.pt'
 
-        torch.save(Delta, savepath)
-        print(f'Weight delta has been saved to {savepath}')
+            torch.save(Delta, savepath)
+            print(f'[Server] Update vectors have been saved to {savepath}')
 
     ## Aggregation functions ##
 
