@@ -7,13 +7,14 @@
 - `./aaa`: the architecture and the training configurations of our **A**ttack-**A**daptive **A**ggregation model
 - `./rules`: previous rule-based approaches for defending adversarial attacks
 - `./tasks`: the FL tasks, including the definition of the datasets and the DNN models involved
-- `./utils`: helper functions for adapting and evaluating the defenses in our FL framework
+- `./utils`: helper functions for allocating resources, adapting and evaluating the defenses in our FL framework
 
 
 
 
-## Running Federated Learning
-We provide a simple framework for simulating FL in a local machine. Take a look at the example in `FL.ipynb` for its usages. 
+## Running Federated Learning tasks
+### Demos 
+We provide a simple framework for simulating FL in a local machine. Take a look at the example in [FL.ipynb](FL.ipynb) for its usages. 
 
 ### Command line tools
 ```
@@ -27,7 +28,7 @@ Check out `parser.py` for the use of the arguments, most of them are self-explan
 - If `--save_model_weights` is specified, the local models and their label (benign or malicious) will be saved under `./AggData` directory. This is how we can collect empirical update vectors.
 ## Training Attack-Adaptive Aggregation model
 ### Demos 
-Check `AAA.ipynb` for a demo of our Attack-Adaptive Aggregation on a synthetic dataset.
+Check [AAA.ipynb](AAA.ipynb) for a demo of our Attack-Adaptive Aggregation on a synthetic dataset.
 
 ### Command line tools
 To train on the empirical update vectors of FL, you need to locate the list of paths that contains the saved update vectors. The list of paths can be specified by concatenating `--path_prefix` and each line of the `--train_path`. Please check `./aaa/args_cifar_backdoor` for an example.  After that, run the following
