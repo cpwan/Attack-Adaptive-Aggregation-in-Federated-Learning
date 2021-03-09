@@ -1,4 +1,7 @@
 # Robust Federated Learning with Attack-Adaptive Aggregation
+
+This is the code for our paper: https://arxiv.org/abs/2102.05257
+
 ## Code structures
 - `server.py, client,py, dataloader.py`: our FL framework
 - `main.py`: entry point of the command line tool, it allocates resources and print out FL configs
