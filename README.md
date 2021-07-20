@@ -1,7 +1,7 @@
 # Robust Federated Learning with Attack-Adaptive Aggregation
 
 This is the codes for our [paper](https://arxiv.org/abs/2102.05257) accepted in FL-IJCAI'21.\
-Check the [runx branch](https://github.com/cpwan/Attack-Adaptive-Aggregation/tree/runx) for latest codes for automating experiments.
+Check the [runx branch](https://github.com/cpwan/Attack-Adaptive-Aggregation/tree/runx) for the latest codes for automating experiments.
 
 ## Code structures
 - `server.py, client,py, dataloader.py`: our FL framework
