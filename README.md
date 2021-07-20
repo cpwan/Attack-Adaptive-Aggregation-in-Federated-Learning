@@ -13,6 +13,24 @@
 
 
 ## Running Federated Learning tasks
+
+In this branch, we provide functionalities to create and run multiple FL tasks in parallel with runx. 
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/19el98gPukMd562IEF494cGj-w91BSUmT?usp=sharing)
+
+
+```
+python -m runx.runx train_cifar_rules.yml -i
+
+#or, if GNU parallel is installed
+
+./runScript.sh train_cifar_rules
+```
+
+
+
+
+
 ### Demos 
 We provide a simple framework for simulating FL in a local machine. Take a look at the example in [FL.ipynb](FL.ipynb) for its usages. 
 
