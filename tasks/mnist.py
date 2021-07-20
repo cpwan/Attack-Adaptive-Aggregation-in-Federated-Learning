@@ -1,4 +1,6 @@
 from __future__ import print_function
+import sys, os 
+sys.path.append(os.getcwd()) # for running this file directly from the parent directory "python ./tasks/mnist.py"
 
 import pickle
 
@@ -9,6 +11,7 @@ from torchvision import datasets, transforms
 
 from dataloader import *
 
+train_on_testset=False
 
 class Net(nn.Module):
     '''
@@ -51,7 +54,7 @@ class Net(nn.Module):
 
 def getDataset():
     dataset = datasets.MNIST('./data',
-                             train=True,
+                             train=(not train_on_testset),
                              download=True,
                              transform=transforms.Compose([transforms.Resize((32, 32)),
                                                            transforms.ToTensor(),
@@ -105,7 +108,7 @@ if __name__ == '__main__':
     print("#Initialize a network")
     net = Net()
     summary(net.cuda(), (1, 32, 32))
-
+    print(torch.cuda.memory_summary(abbreviated=True))
     print("\n#Initialize dataloaders")
     loader_types = ['iid', 'byLabel', 'dirichlet']
     for i in range(len(loader_types)):
@@ -119,3 +122,4 @@ if __name__ == '__main__':
     x = next(iter(loader[i]))[0].cuda()
     y = net(x)
     print(f"Size of input:  {x.shape} \nSize of output: {y.shape}")
+    print(torch.cuda.memory_summary(abbreviated=True))

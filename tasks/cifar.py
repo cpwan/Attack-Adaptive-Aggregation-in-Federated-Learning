@@ -1,4 +1,6 @@
 from __future__ import print_function
+import sys, os 
+sys.path.append(os.getcwd()) # for running this file directly from the parent directory "python ./tasks/cifar.py"
 
 import pickle
 
@@ -9,18 +11,22 @@ from torchvision.models.resnet import resnet18
 
 from dataloader import *
 
+train_on_testset=False
 
 def Net():
     num_classes = 10
-    model = resnet18(pretrained=True)
+#     model = resnet18(pretrained=True)
+    model = resnet18(pretrained=False)
     n = model.fc.in_features
     model.fc = nn.Linear(n, num_classes)
     return model
 
 
 def getDataset():
+    train = (not train_on_testset)
     dataset = datasets.CIFAR10('./data',
-                               train=True,
+                               train = train ,
+#                                train=False,
                                download=True,
                                transform=transforms.Compose([transforms.ToTensor(),
                                                              transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]))
@@ -74,7 +80,7 @@ if __name__ == '__main__':
     print("#Initialize a network")
     net = Net()
     summary(net.cuda(), (3, 32, 32))
-
+    print(torch.cuda.memory_summary(abbreviated=True))
     print("\n#Initialize dataloaders")
     loader_types = ['iid', 'dirichlet']
     for i in range(len(loader_types)):
@@ -88,3 +94,4 @@ if __name__ == '__main__':
     x = next(iter(loader[i]))[0].cuda()
     y = net(x)
     print(f"Size of input:  {x.shape} \nSize of output: {y.shape}")
+    print(torch.cuda.memory_summary(abbreviated=True))

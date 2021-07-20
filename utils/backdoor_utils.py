@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import torch
-
+import torch.nn.functional as F
 '''
 Modified upon
 https://github.com/howardmumu/Attack-Resistant-Federated-Learning/blob/70db1edde5b4b9dfb75633ca5dd5a5a7303c1f4c/FedAvg/Update.py#L335
@@ -12,29 +12,13 @@ Fu, Shuhao, et al. "Attack-Resistant Federated Learning with Residual-based Rewe
 
 '''
 import random
-# def getRandomPattern(k=6,seed=0):
-#     random.seed(seed)
-#     c_range=[0,1,2]
-#     xylim=6
-#     x_range=list(range(xylim))
-#     y_range=list(range(xylim))
-#     x_offset=random.randint(0,32-xylim)
-#     y_offset=random.randint(0,32-xylim)
-#     x_range=list(map(lambda u: u+x_offset, x_range))
-#     y_range=list(map(lambda u: u+y_offset, y_range))
-    
-#     combo = [c_range, x_range, y_range]
-#     pattern = set()
-#     while len(pattern) < k:
-#         elem = tuple([random.choice(comp) for comp in combo])
-#         pattern.add(elem)
 
-#     return list(pattern)
-
-def getRandomPattern(k=6,seed=0):
-    pattern=[[0, 0, 0], [0, 0, 1], [0, 0, 2],   [0, 0, 4], [0, 0, 5], [0, 0, 6],\
+defaultPattern=[[0, 0, 0], [0, 0, 1], [0, 0, 2],   [0, 0, 4], [0, 0, 5], [0, 0, 6],\
                                  
                                  [0, 2, 0], [0, 2, 1], [0, 2, 2],   [0, 2, 4], [0, 2, 5], [0, 2, 6], ]
+
+def getRandomPattern(k=6,seed=0):
+    pattern=defaultPattern
     random.seed(seed)
     c=random.randint(0,3)
     xylim=6
@@ -49,11 +33,8 @@ def getRandomPattern(k=6,seed=0):
     return list(pattern)
 
 def getDifferentPattern(y_offset, x_offset, y_interval=1, x_interval=1):
-    pattern=[[0, 0, 0], [0, 0, 1], [0, 0, 2],   [0, 0, 4], [0, 0, 5], [0, 0, 6],\
-                                 
-                                 [0, 2, 0], [0, 2, 1], [0, 2, 2],   [0, 2, 4], [0, 2, 5], [0, 2, 6], ]
-#     random.seed(seed)
-#     c=random.randint(0,3)
+    pattern=defaultPattern
+
     c=0
     xylim=6
     pattern=[[c,p[1]+x_offset,p[2]+y_offset] for p in pattern]
@@ -66,10 +47,8 @@ class Backdoor_Utils():
 
     def __init__(self):
         self.backdoor_label = 2
-        self.trigger_position = [[0, 0, 0], [0, 0, 1], [0, 0, 2],   [0, 0, 4], [0, 0, 5], [0, 0, 6],\
-                                 
-                                 [0, 2, 0], [0, 2, 1], [0, 2, 2],   [0, 2, 4], [0, 2, 5], [0, 2, 6], ]
-        self.trigger_value = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ]
+        self.trigger_position = torch.Tensor(defaultPattern).long()
+        self.trigger_value = torch.Tensor([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ])
 
     def get_poison_batch(self, data, targets, backdoor_fraction, backdoor_label, evaluation=False):
         #         poison_count = 0
@@ -97,11 +76,19 @@ class Backdoor_Utils():
             new_targets.requires_grad_(False)
         return new_data, new_targets
 
+    def interpolate_patterns(self,size):
+        patch=torch.zeros(1,32,32)
+        tp=self.trigger_position
+        patch[tp[:,0],tp[:,1],tp[:,2]]=self.trigger_value
+        interpolate=F.interpolate(patch.unsqueeze(0),size=(size)).squeeze(0)
+        sparse=interpolate.to_sparse()
+        trigger_position=sparse.indices().permute(1,0)
+        trigger_value=sparse.values()
+        return trigger_position, trigger_value
+        
     def add_backdoor_pixels(self, item):
-
-        for i in range(0, len(self.trigger_position)):
-            pos = self.trigger_position[i]
-            item[pos[0]][pos[1]][pos[2]] = self.trigger_value[i]
+        tp,tv=self.interpolate_patterns(item.shape[1:])
+        item[tp[:,0],tp[:,1],tp[:,2]]=tv
         return item
     
     def setTrigger(self,x_offset,y_offset,x_interval,y_interval):

@@ -1,0 +1,35 @@
+CMD: 'CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py'
+
+HPARAMS: [
+{  trial: [0,1,2],
+  dataset: ['cifar'],  
+  loader_type: 'dirichlet',
+  num_clients: 10,
+  inner_epochs: 1,
+  epochs: 30,
+  lr: 0.1,
+  attacks: 'noAttack',
+  AR: ['fedavg','median','gm','mkrum','foolsgold','residualbase'],
+  train_on_testset: false,
+  save_model_weights: true,
+  output_folder: 'cifarAggData',
+  experiment_name: LOGDIR,
+  RUNX.TAG: 'cifar_noAttack',
+  },
+{
+  attacks: 'backdoor',
+  n_attacker_backdoor: [1,2,3,4],  
+  RUNX.TAG: 'cifar_backdoor',
+  },
+{
+  attacks: 'labelFlipping',
+  n_attacker_labelFlippingDirectional: [1,2,3,4],  
+  RUNX.TAG: 'cifar_labelFlipping',
+  },
+{
+  attacks: 'omniscient',
+  n_attacker_omniscient: [1,2,3,4],  
+  RUNX.TAG: 'cifar_omniscient',
+  }, 
+  
+  ]

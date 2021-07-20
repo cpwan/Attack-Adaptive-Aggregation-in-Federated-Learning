@@ -8,6 +8,10 @@ from utils.backdoor_semantic_utils import SemanticBackdoor_Utils
 from utils.backdoor_utils import Backdoor_Utils
 from clients import *
 
+config={
+    'label_flipping' : {'attacked_classes': [1],
+                       'target_class':7}    
+}
 
 class Attacker_LabelFlipping1to7(Client):
     def __init__(self, cid, model, dataLoader, optimizer, criterion=F.nll_loss, device='cpu', inner_epochs=1):
@@ -15,7 +19,9 @@ class Attacker_LabelFlipping1to7(Client):
                                                          inner_epochs)
 
     def data_transform(self, data, target):
-        target_ = torch.tensor(list(map(lambda x: 7 if x == 1 else x, target)))
+        attacked_classes = config['label_flipping']['attacked_classes']
+        target_class = config['label_flipping']['target_class']
+        target_ = torch.tensor(list(map(lambda x: target_class if x in attacked_classes else x, target)))
         assert target.shape == target_.shape, "Inconsistent target shape"
         return data, target_
 

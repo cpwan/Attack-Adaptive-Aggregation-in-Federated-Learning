@@ -15,31 +15,37 @@ class MLP(nn.Module):
 
     def forward(self, beta, x):  ##beta does nth, just for ease of using existing pipelines
         vout = x
-        #         print(x.shape)
         x = x.view(x.shape[0], -1)
-        #         print(x.shape)
         attention_scores = self.main(x)
         attention_weights = F.softmax(attention_scores, dim=-1)
-        #         print(vout.shape)
-        #         print(attention_weights.shape)
         out = torch.einsum('bk,bjk -> bj', attention_weights, vout).unsqueeze(-1)
 
         return out
 
     def getWeight(self, beta, x):
-        #         print(x.shape)
         x = x.view(x.shape[0], -1)
-        #         print(x.shape)
         attention_scores = self.main(x).unsqueeze(1)
         attention_weights = F.softmax(attention_scores, dim=-1)
         return attention_weights
-
-
+    
+    def getScores(self, beta, x):
+        x = x.view(x.shape[0], -1)
+        attention_scores = self.main(x).unsqueeze(1)
+        return attention_scores
+    
+    def getALL(self, beta, x):
+        vout = x
+        x = x.view(x.shape[0], -1)
+        attention_scores = self.main(x)
+        attention_weights = F.softmax(attention_scores, dim=-1)
+        out = torch.einsum('bk,bjk -> bj', attention_weights, vout).unsqueeze(-1)
+        return out, attention_weights, attention_scores
+    
 class Net():
     def __init__(self):
         self.path_to_net = "./aaa/attention.pt"
 
-    def main(self, deltas: list, model):
+    def main(self, inputs, model):
         '''
         deltas: a list of state_dicts
 
@@ -48,18 +54,11 @@ class Net():
 
         '''
 
-        stacked = utils.stackStateDicts(deltas)
-
-        param_trainable = utils.getTrainableParameters(model)
-        param_nontrainable = [param for param in stacked.keys() if param not in param_trainable]
-        for param in param_nontrainable:
-            del stacked[param]
-
-        proj_vec = convert_pca._convertWithPCA(stacked)
+        proj_vec,deltas=inputs
 
         print(proj_vec.shape)
         model = MLP(proj_vec.shape[0] * 10, 10)
-        model.load_state_dict(torch.load(self.path_to_net))
+        model.load_state_dict(torch.load(self.path_to_net)['state_dict'])
         model.eval()
 
         x = proj_vec.unsqueeze(0)

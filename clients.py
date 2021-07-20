@@ -38,6 +38,7 @@ class Client():
         self.model.to(self.device)
         self.model.train()
         for epoch in range(self.inner_epochs):
+
             for batch_idx, (data, target) in enumerate(self.dataLoader):
                 data, target = self.data_transform(data, target)
                 data, target = data.to(self.device), target.to(self.device)
@@ -65,11 +66,7 @@ class Client():
         test_loss /= len(testDataLoader.dataset)
         self.model.cpu()  ## avoid occupying gpu when idle
         # Uncomment to print the test scores of each client
-        print('client {} ## Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(self.cid,
-                                                                                              test_loss, correct, len(
-                testDataLoader.dataset),
-                                                                                              100. * correct / len(
-                                                                                                  testDataLoader.dataset)))
+        print(f'[Client {self.cid}] Local evaluation: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(testDataLoader.dataset)} ({100. * correct / len(testDataLoader.dataset):.0f}%)')
 
     def update(self):
         assert self.isTrained, 'nothing to update, call train() to obtain gradients'

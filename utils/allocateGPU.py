@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 def getAvaliableGPU():
-    allowed_GPU = np.array([5,6])  # only the gpu in the list can be used
+    allowed_GPU = np.array([5,6,7,8])  # only the gpu in the list can be used
     MEM=[int(x.split()[2]) for x in np.array(
         subprocess.Popen("nvidia-smi -q -d Memory | grep -A4 GPU | grep Free", shell=True,
                          stdout=subprocess.PIPE).stdout.readlines())[allowed_GPU]]

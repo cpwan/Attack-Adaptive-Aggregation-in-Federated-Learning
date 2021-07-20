@@ -3,19 +3,33 @@ import sys
 
 sys.path.append(os.getcwd())
 print(sys.path)
+from runx.logx import logx
 
 import torch
 import torch.nn.functional as F
+import aaa.attention
 from aaa.attention import AttentionLoop
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
-
+from utils.metrics import AverageMeter
 
 def getTensorData(path_to_folder, idx):
-    data = torch.load(f'{path_to_folder}/pca_{idx}.pt')
-    label = torch.load(f'{path_to_folder}/label.pt')
-
+    try:
+        data = torch.load(f'{path_to_folder}/pca_{idx}.pt')
+        label = torch.load(f'{path_to_folder}/label.pt')
+    except:
+        return None
+    # update vectors with extreme large magnitude can cause divergence, limit it here
+    cap=5.0
+    if data.max()>cap or data.min()<-cap:
+        return None
+    
+    # scale each dimension randomly
+    data*=(torch.randn((data.shape[0],1))*0.1+1)
+    
+    # permute the clients in random order
     perm = torch.randperm(len(label))
     data = data[:, perm]
+    
     label = label[perm]
 
     label_norm = F.normalize(label, p=1, dim=-1)
@@ -30,6 +44,29 @@ def getTensorData(path_to_folder, idx):
     return x, y, c
 
 
+
+
+class FLdata(Dataset):
+
+    def __init__(self, path_to_folder, indexes):
+        self.path_to_folder = path_to_folder
+        self.indexes = []
+        
+        for i in indexes:
+            sample = getTensorData(self.path_to_folder, i)
+            if sample!=None:
+                self.indexes.append(i)
+        self.size = len(self.indexes)
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        sample = getTensorData(self.path_to_folder, self.indexes[idx])   
+        if sample ==None:
+            print('DEBUG: ',self.path_to_folder, self.indexes, idx)
+        return sample
+
 # getting a hard prediction by binarizing the affinity matrix
 def getBinaryPred(model, x, beta):
     weight = model.getWeight(beta, x)
@@ -39,29 +76,11 @@ def getBinaryPred(model, x, beta):
     return predB
 
 
-# helper class to record the accumulating loss
-# +=: add loss
-# print(**): print the average loss
-class loss_acc():
-    def __init__(self):
-        self.sum = 0.0
-        self.n = 0
-
-    def __iadd__(self, x):
-        self.sum += x
-        self.n += 1
-        return self
-
-    def value(self):
-        return self.sum / self.n
-
-    def __str__(self):
-        return f'{self.sum / self.n:.6f}'
-
 
 def test(model, testloader):
-    lossCounter = loss_acc()
-    lossCounter2 = loss_acc()
+    criterion=torch.nn.L1Loss(reduction='mean')
+    losses_soft = AverageMeter('loss soft')
+    losses_hard = AverageMeter('loss hard')
 
     model.eval()
 
@@ -70,89 +89,85 @@ def test(model, testloader):
             x = x.cuda()
             y = y.cuda()
             c = c.cuda()
-            beta = x.median(dim=-1, keepdim=True)[0]
+#             beta = x.median(dim=-1, keepdim=True)[0]
+            beta = x.mean(dim=-1, keepdim=True)
 
             pred = model.cuda()(beta, x)
-            loss = loss_fn(pred, c[:, :, [0]])
+            loss = criterion(pred, c[:, :, [0]])
 
             pred_b = getBinaryPred(model, x, beta)
-            loss_b = loss_fn(pred_b, c[:, :, [0]])
+            loss_b = criterion(pred_b, c[:, :, [0]])
 
-            lossCounter += loss.cpu().detach().numpy()
-            lossCounter2 += loss_b.cpu().detach().numpy()
-    # print(f'{loss:.4f},{loss_b:.6f}')
-    return lossCounter, lossCounter2
+            losses_soft.update(loss.cpu().detach().numpy(), n = x.shape[0])
+            losses_hard.update(loss_b.cpu().detach().numpy(),n = x.shape[0])
+    return losses_soft, losses_hard
 
 
 def test_classes(model, testloader):
-    def loss_fn(pred, gt):
-        correct = (pred == gt).all(dim=-1).sum()
-        n = pred.shape[0]
-        return correct, n
+    def criterion(pred, gt):
+        loss = (pred == gt).all(dim=-1).float().mean()
+        return loss
 
-    correct = 0
-    n = 0
+    accuracies = AverageMeter('Acc')
 
     model.eval()
 
     with torch.no_grad():
         for x, y, c in testloader:
-            beta = x.median(dim=-1, keepdim=True)[0]
+#             beta = x.median(dim=-1, keepdim=True)[0]
+            beta = x.mean(dim=-1, keepdim=True)
 
             weight = model.getWeight(beta, x)
             weight = torch.nn.Threshold(0.8 * 1.0 / weight.shape[-1], 0)(weight)
             pred = (weight != 0) * 1.0
-            accuracy = loss_fn(pred, y[:, [0], :])
-            correct += accuracy[0]
-            n += accuracy[1]
-    # print(f'{loss:.4f},{loss_b:.6f}')
-    return correct * 1.0 / n
+            accuracy = criterion(pred, y[:, [0], :])
+            accuracies.update(accuracy.cpu().detach().numpy(), n = x.shape[0])
+
+    return accuracies
 
 
-def test_classes_hamming(model, testloader):
-    def loss_fn(pred, gt):
-        #         print(pred.shape,gt.shape)
-        #         print("\n\n\n",pred,"\n\n\n",gt)
-        n = pred.shape[0]
-        correct = (pred - gt / gt.sum(2, keepdim=True)).abs().sum()
+def test_classes_l1(model, testloader):
 
-        return correct, n
-
-    correct = 0
-    n = 0
+    criterion=torch.nn.L1Loss(reduction='mean')
+    losses = AverageMeter('l1 loss on classes')
 
     model.eval()
 
     with torch.no_grad():
         for x, y, c in testloader:
-            beta = x.median(dim=-1, keepdim=True)[0]
+#             beta = x.median(dim=-1, keepdim=True)[0]
+            beta = x.mean(dim=-1, keepdim=True)
 
-            weight = model.getWeight(beta, x)
+            pred_weight = model.getWeight(beta, x)
             #             weight = torch.nn.Threshold(0.8 * 1.0 / weight.shape[-1],0)(weight)
             #             pred =  (weight != 0) * 1.0
-            pred = weight
+            gt = y[:, [0], :]
+            gt = gt / gt.sum(2, keepdim=True)
+            loss = criterion(pred_weight, gt)
+            losses.update(loss.cpu().detach().numpy(), n = x.shape[0])
 
-            accuracy = loss_fn(pred, y[:, [0], :])
-            correct += accuracy[0]
-            n += accuracy[1]
-    # print(f'{loss:.4f},{loss_b:.6f}')
-    return correct * 1.0 / n
+    return losses
 
+def test_scores_l1(model, testloader):
 
-class FLdata(Dataset):
+    criterion=torch.nn.L1Loss(reduction='mean')
+    losses = AverageMeter('l1 loss on scores')
+    
+    model.eval()
 
-    def __init__(self, path_to_folder, indexes):
-        self.path_to_folder = path_to_folder
-        self.indexes = indexes
-        self.size = len(indexes)
+    with torch.no_grad():
+        for x, y, c in testloader:
+#             beta = x.median(dim=-1, keepdim=True)[0]
+            beta = x.mean(dim=-1, keepdim=True)
 
-    def __len__(self):
-        return self.size
+            pred_scores = model.getScores(beta, x)
 
-    def __getitem__(self, idx):
-        sample = getTensorData(self.path_to_folder, self.indexes[idx])
-        return sample
+            gt = y[:, [0], :]
+            gt = gt*2-1
+            loss = criterion(pred_scores, gt)
+            losses.update(loss.cpu().detach().numpy(), n = x.shape[0])
 
+    return losses
 
 if __name__ == "__main__":
 
@@ -178,11 +193,20 @@ if __name__ == "__main__":
     parser.add_argument("--max_round", type=int, default=30)
     parser.add_argument("--hidden_size", type=int, default=21)
     parser.add_argument("--batch_size", type=int, default=32)
-
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--class_reg_scale", type=float, default=1e-2, help="from 0 to 1")
+    parser.add_argument("--init_weight", action='store_true')
+    parser.add_argument("--layer_init_noise", type=float, default=1e-3)
     args = parser.parse_args()
-
+    args_dict=vars(args).copy()
+    args_dict.pop('train_path')
+    args_dict.pop('test_path')
+    args_dict.pop('save_path')    
+    logx.initialize(logdir=args.log_path, coolname=True, tensorboard=True,
+                    hparams=args_dict)
     for arg in vars(args):
-        print(arg, "\n", getattr(args, arg), "\n")
+        logx.msg(arg)
+        logx.msg(str(getattr(args, arg)))
 
     path_prefix = args.path_prefix
     save_path = args.save_path
@@ -195,49 +219,62 @@ if __name__ == "__main__":
     max_round = args.max_round
     hidden_size = args.hidden_size
     batch_size = args.batch_size
+    learning_rate = args.lr
     
-    import os
-    os.makedirs(os.path.dirname(f"{log_path}{eps}_{scale}_{hidden_size}.txt"), exist_ok=True)
-    print(f'train soft| train hard| valid soft|valid hard| median| mean \t\t train|valid|test',
-          file=open(f"{log_path}{eps}_{scale}_{hidden_size}.txt", "w"))
-
+    aaa.attention.init_weight=args.init_weight
+    aaa.attention.layer_init_noise = args.layer_init_noise
+    
+    assert args.class_reg_scale<=1 and args.class_reg_scale>=0, "The scale of losses loss_1*t+loss_2*(1-t) should be from 0 to 1"
     #     exit(0)
     from utils import allocateGPU
 
     allocateGPU.allocate_gpu()
 
-    learning_rate = 1e-4
-
+    
     trainDataset = ConcatDataset(
-        [FLdata(path_prefix + path_to_folder, list(range(0, max_round))) for path_to_folder in train_path])
-#     validDataset = ConcatDataset(
-#         [FLdata(path_prefix + path_to_folder, list(range(max_round // 3 * 2, max_round))) for path_to_folder in
-#          train_path])
+        list(filter(lambda dset:len(dset)>0, 
+               [FLdata(path_prefix + path_to_folder, list(range(0, max_round ))) for path_to_folder in
+         test_path]
+              ))
+    )
+
     validDataset = ConcatDataset(
-        [FLdata(path_prefix + path_to_folder, list(range(0, max_round // 3 ))) for path_to_folder in
-         test_path])
-    testSet = [FLdata(path_prefix + path_to_folder, list(range(0, max_round))) for path_to_folder in test_path]
+        list(filter(lambda dset:len(dset)>0, 
+               [FLdata(path_prefix + path_to_folder, list(range(0, max_round // 3 ))) for path_to_folder in
+         test_path]
+              ))
+    )
+    
+    attack_types=['noAttack','backdoor','labelFlipping','omniscient']
+    path_to_attacks=dict([(attack,[p for p in test_path if attack in p]) for attack in attack_types])
+    path_to_attacks=dict([(attack,paths) for (attack,paths) in path_to_attacks.items() if len(paths)>0])
+    
+    # A dataset for each type of attacks
+    testSet = [ConcatDataset(
+        list(filter(lambda dset:len(dset)>0,
+               [FLdata(path_prefix + p, list(range(0, max_round))) for p in paths]
+              ))
+    )
+               for paths in path_to_attacks.values()]
     testDataset = ConcatDataset(testSet)
-    print(*test_path, sep=',', file=open(f"{log_path}{eps}_{scale}_{hidden_size}_long.txt", "w"))
+    print(*path_to_attacks.keys(), sep=',', file=open(f"{log_path}/{eps}_{scale}_{hidden_size}_l1.csv", "w"))
+    print(*path_to_attacks.keys(), sep=',', file=open(f"{log_path}/{eps}_{scale}_{hidden_size}_acc.csv", "w"))
+    print(*path_to_attacks.keys(), sep=',', file=open(f"{log_path}/{eps}_{scale}_{hidden_size}_s.csv", "w"))
 
     
     dataloader = DataLoader(trainDataset, batch_size=batch_size, shuffle=True)
-    print('Loaded train dataset',
-          file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
+    logx.msg('Loaded train dataset')
     validloader = DataLoader(validDataset, batch_size=batch_size, shuffle=True)
-    print('Loaded validation dataset',
-          file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
+    logx.msg('Loaded validation dataset')
     testloader = DataLoader(testDataset, batch_size=batch_size, shuffle=True)
-    print('Loaded test dataset',
-          file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
+    logx.msg('Loaded test dataset')
     testloaderSeparate = [DataLoader(testItem, batch_size=max_round, shuffle=True) for testItem in testSet]
-    print('Loaded test dataset separately',
-              file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
+    logx.msg('Loaded test dataset separately')
     k = trainDataset[0][0].shape[0]
 
     model = AttentionLoop(k, hidden_size, nloop=5, eps=eps, scale=scale)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    loss_fn = torch.nn.L1Loss(reduction='mean')
+    criterion = torch.nn.L1Loss(reduction='mean')
 
     # for query=key:=identity, l1 score ~= 0.6
     train_loss = []
@@ -249,10 +286,10 @@ if __name__ == "__main__":
     test_acc = []
     best_testScore=1000000
     for i in range(epochs):
-        lossCounter = loss_acc()
-        lossCounter2 = loss_acc()
-        lossCounter_median_ref = loss_acc()
-        lossCounter_mean_ref = loss_acc()
+        losses_soft = AverageMeter('loss soft')
+        losses_hard = AverageMeter('loss hard')
+        losses_median_ref = AverageMeter('loss median')
+        losses_mean_ref = AverageMeter('loss mean')
 
         for x, y, c in dataloader:
             optimizer.zero_grad()
@@ -260,63 +297,85 @@ if __name__ == "__main__":
             y = y.cuda()
             c = c.cuda()
             ## give a different prior to avoid over fitting
-            beta = x.median(dim=-1, keepdim=True)[0]  # if (torch.rand(1)<0.5).item() else x.mean(dim=-1,keepdim=True)
+#             beta = x.median(dim=-1, keepdim=True)[0]  # if (torch.rand(1)<0.5).item() else x.mean(dim=-1,keepdim=True)
+            convex_weight = torch.rand(x.shape[0],x.shape[2],1) # bsz by n by 1
+            convex_weight = F.normalize(convex_weight, p=1, dim=1)
+            convex_weight = convex_weight.cuda()
+            beta = torch.bmm(x,convex_weight)
 
-            # loss=loss_fn(model.cuda()(x),y[:,[0],:])
-            # loss=loss_fn(model.cuda()(x,x),z)
-            pred = model.cuda()(beta, x)
-            loss = loss_fn(pred, c[:, :, [0]])
+            pred ,predW, predS = model.cuda().getALL(beta, x)
+            
+            gt_Center=c[:, :, [0]]
+            target_loss = criterion(pred, gt_Center)
+            
+            gt_W=y[:, [0], :]
+            gt_W = gt_W / gt_W.sum(2, keepdim=True)
+            class_loss = criterion(predW, gt_W)
+            loss = target_loss * (1-args.class_reg_scale)+\
+                        class_loss * (args.class_reg_scale)
 
             pred_b = getBinaryPred(model, x, beta)
-            loss_b = loss_fn(pred_b, c[:, :, [0]])
+            loss_b = criterion(pred_b, gt_Center)
 
-            lossCounter += loss.cpu().detach().numpy()
-            lossCounter2 += loss_b.cpu().detach().numpy()
+            losses_soft.update(loss.cpu().detach().numpy(), n = x.shape[0])
+            losses_hard.update(loss_b.cpu().detach().numpy(), n = x.shape[0])
 
-            loss_median_ref = loss_fn(beta, c[:, :, [0]])
-            loss_mean_ref = loss_fn(x.mean(dim=-1, keepdim=True), c[:, :, [0]])
+            loss_median_ref = criterion(beta, gt_Center)
+            loss_mean_ref = criterion(x.mean(dim=-1, keepdim=True), gt_Center)
 
-            lossCounter_median_ref += loss_median_ref.cpu().detach().numpy()
-            lossCounter_mean_ref += loss_mean_ref.cpu().detach().numpy()
-            # print(f'{loss:.4f},{loss_b:.6f}')
+            losses_median_ref.update(loss_median_ref.cpu().detach().numpy(), n = x.shape[0])
+            losses_mean_ref.update(loss_mean_ref.cpu().detach().numpy(), n =x.shape[0])
 
             loss.backward()
             optimizer.step()
-        # print(f'train: {lossCounter},{lossCounter2}')
-        print(f'Model trained for {i}-th epoch',
-                  file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
-        lossCounter_test, lossCounter2_test = test(model, testloader)
 
-        train_score = test_classes_hamming(model.cpu(), dataloader)
-        valid_score = test_classes_hamming(model.cpu(), validloader)
-        test_score = test_classes_hamming(model.cpu(), testloader)
-        print(f'Model tested for {i}-th epoch',
-                  file=open(f"{log_path}{eps}_{scale}_{hidden_size}_log.txt", "a"))
-        print(
-            f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
-        accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}')
-        print(
-            f'{lossCounter}|{lossCounter2}|{lossCounter_test}|{lossCounter2_test}|{lossCounter_median_ref}|{lossCounter_mean_ref}\t \
-        accuracy: {train_score:.6f}, {valid_score:.6f}, {test_score:.6f}',
-            file=open(f"{log_path}{eps}_{scale}_{hidden_size}.txt", "a"))
-        print()
-        train_loss.append(lossCounter.value())
-        train_loss_hard.append(lossCounter2.value())
-        valid_loss.append(lossCounter_test.value())
-        valid_loss_hard.append(lossCounter2_test.value())
+        logx.msg(f'Model trained for {i}-th epoch')
+        losses_soft_val, losses_hard_val = test(model, testloader)
 
-        train_acc.append(train_score)
-        valid_acc.append(valid_score)
-        test_acc.append(test_score)
+        train_score = test_classes_l1(model.cpu(), dataloader)
+        valid_score = test_classes_l1(model.cpu(), validloader)
+        test_score = test_classes_l1(model.cpu(), testloader)
+        logx.msg(f'Model tested for {i}-th epoch')
+        logx.msg(
+            f'{losses_soft.avg}|{losses_hard.avg}|{losses_soft_val.avg}|{losses_hard_val.avg}|{losses_median_ref.avg}|{losses_mean_ref.avg}\t \
+        accuracy: {train_score.avg:.6f}, {valid_score.avg:.6f}, {test_score.avg:.6f}')
 
-        test_acc_sep = [test_classes_hamming(model.cpu(), testloader_sep).item() for testloader_sep in
+
+        
+        test_acc_sep = [test_classes(model.cpu(), testItem).avg for testItem in
                         testloaderSeparate]
-        print(*test_acc_sep, sep=',', file=open(f"{log_path}{eps}_{scale}_{hidden_size}_long.txt", "a"))
+        print(*test_acc_sep, sep=',', file=open(f"{log_path}/{eps}_{scale}_{hidden_size}_acc.csv", "a"))
+        
+        test_acc_sep = [test_classes_l1(model.cpu(), testItem).avg for testItem in
+                        testloaderSeparate]
+        print(*test_acc_sep, sep=',', file=open(f"{log_path}/{eps}_{scale}_{hidden_size}_l1.csv", "a"))
 
-        if ((i + 1) % 100 == 0):
-            torch.save(model.state_dict(), f"{save_path[:-3]}_{eps}_{scale}_{hidden_size}_{i}.pt")
-        if best_testScore>test_score:
-            best_testScore=test_score
-            torch.save(model.state_dict(), f"{save_path[:-3]}_{eps}_{scale}_{hidden_size}.pt")
+        test_acc_sep = [test_scores_l1(model.cpu(), testItem).avg for testItem in
+                        testloaderSeparate]
+        print(*test_acc_sep, sep=',', file=open(f"{log_path}/{eps}_{scale}_{hidden_size}_s.csv", "a"))
+        
+        train_acc=test_classes(model.cpu(), dataloader)
+        test_acc=test_classes(model.cpu(), testloader)
 
-    torch.save(model.state_dict(), f"{save_path[:-3]}_{eps}_{scale}_{hidden_size}.pt")
+        metrics = {'loss(train)': losses_soft.avg, 'loss on class(train)': train_score.avg}
+        logx.metric(phase='train', metrics=metrics, epoch=i)
+        
+        metrics = {'loss': losses_soft_val.avg, 
+                   'loss on class': test_score.avg, 
+                   'acc': test_acc.avg,
+                   'loss(train)': losses_soft.avg, 
+                   'loss on class(train)': train_score.avg, 
+                   'acc(train)': train_acc.avg,
+                   'loss _median': losses_median_ref.avg,
+                   'loss _mean': losses_mean_ref.avg
+                  }
+        logx.metric(phase='val', metrics=metrics, epoch=i)
+        
+        save_dict = {'epoch': i + 1,
+                     'state_dict': model.state_dict(),
+                     'hparam': model.hparam,
+                     'best_loss': test_score.avg,
+                     'optimizer' : optimizer.state_dict()}
+        logx.save_model(save_dict, metric=test_score.avg, epoch=i, higher_better=False)
+        
+        
