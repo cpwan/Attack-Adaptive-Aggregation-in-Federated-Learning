@@ -51,6 +51,6 @@ Check [AAA.ipynb](AAA.ipynb) for a demo of our Attack-Adaptive Aggregation on a 
 ### Command line tools
 To train on the empirical update vectors of FL, you need to locate the list of paths that contains the saved update vectors. The list of paths can be specified by concatenating `--path_prefix` and each line of the `--train_path`. Please check `./aaa/args_cifar_backdoor` for an example.  After that, run the following
 ```
-python aaa/train_attention.py @aaa/args_cifar_backdoor --eps 0.005 --scale 0.5
+python aaa/train_attention.py @aaa/args --eps 0.005 --scale 0.5
 ```
-where `--eps` and `--scale` are the hyperparameters of our model, please check out our paper for the definition.
+where `--eps` and `--scale` are the hyperparameters of our model, please check out our paper for the definition. The `@aaa/args` is the file where the paths to training data are specified. 
