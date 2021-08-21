@@ -1,6 +1,10 @@
 # Robust Federated Learning with Attack-Adaptive Aggregation
-This is the codes for our [paper](https://arxiv.org/abs/2102.05257) accepted in FTL-IJCAI'21.\
-Check the [runx branch](https://github.com/cpwan/Attack-Adaptive-Aggregation/tree/runx) for the latest codes for automating experiments.
+This is the code for our [paper](https://arxiv.org/abs/2102.05257).
+
+- **8/21/2021** : Our paper won the [best paper award](http://federated-learning.org/fl-ijcai-2021/BestPaper.png) in FTL-IJCAI'21 :sunglasses:.
+- **7/20/2021** : Our paper has been accepted by the [FTL-IJCAI'21](http://federated-learning.org/fl-ijcai-2021/) workshop for oral presentation.
+- **7/20/2021** : We have released the latest codes for automating experiments in the [runx branch](https://github.com/cpwan/Attack-Adaptive-Aggregation/tree/runx).
+
 ## Abstract
 Federated learning is vulnerable to various attacks, such as model poisoning and backdoor attacks, even if some existing defense strategies are used. To address this challenge, we propose an attack-adaptive aggregation strategy to defend against various attacks for robust federated learning. The proposed approach is based on training a neural network with an attention mechanism that learns the vulnerability of federated learning models from a set of plausible attacks. To the best of our knowledge, our aggregation strategy is the first one that can be adapted to defend against various attacks in a data-driven fashion. Our approach has achieved competitive performance in defending model poisoning
 and backdoor attacks in federated learning tasks on image and text datasets.
